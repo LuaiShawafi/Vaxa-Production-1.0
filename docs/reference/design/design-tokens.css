@@ -1,0 +1,94 @@
+:root {
+  --bg: #F5F7F4;
+  --surface: #FFFFFF;
+  --surface-2: #EEF2ED;
+  --text: #18201B;
+  --muted: #6B756D;
+  --line: #DFE5DF;
+
+  --green: #2F6B48;
+  --green-dark: #214D35;
+  --green-soft: #E4EFE7;
+
+  --amber: #B67818;
+  --amber-soft: #FBF0DC;
+
+  --red: #B34B44;
+  --red-soft: #F8E4E2;
+
+  --blue: #426B8F;
+  --blue-soft: #E7EEF5;
+
+  --radius-sm: 8px;
+  --radius-md: 10px;
+  --radius-lg: 12px;
+  --radius-card: 16px;
+  --radius-hero: 20px;
+  --radius-pill: 999px;
+
+  --shadow-card: 0 8px 24px rgba(24,32,27,.06);
+  --shadow-button: 0 1px 2px rgba(0,0,0,.02);
+
+  --sidebar-width: 236px;
+  --main-pad-x: 32px;
+  --main-pad-top: 28px;
+  --grid-gap: 16px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+body { font-size: 14px; }
+
+button, input, select, textarea { font: inherit; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.btn {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-button);
+}
+
+.btn.primary {
+  background: var(--green-dark);
+  border-color: var(--green-dark);
+  color: #FFFFFF;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 10px;
+  font-weight: 750;
+}
+
+.pill.green { background: var(--green-soft); color: var(--green-dark); }
+.pill.amber { background: var(--amber-soft); color: #8C5E12; }
+.pill.red   { background: var(--red-soft); color: #943B35; }
+.pill.blue  { background: var(--blue-soft); color: #355A79; }
+
+@media (max-width: 1050px) {
+  /* Collapse sidebar to icon rail and use 6-column KPI layout. */
+}
+
+@media (max-width: 700px) {
+  /* Switch to stacked/mobile layout. */
+}

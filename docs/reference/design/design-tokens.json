@@ -1,0 +1,53 @@
+{
+  "colors": {
+    "background": "#F5F7F4",
+    "surface": "#FFFFFF",
+    "surface_2": "#EEF2ED",
+    "text": "#18201B",
+    "muted": "#6B756D",
+    "line": "#DFE5DF",
+    "green": "#2F6B48",
+    "green_dark": "#214D35",
+    "green_soft": "#E4EFE7",
+    "amber": "#B67818",
+    "amber_soft": "#FBF0DC",
+    "red": "#B34B44",
+    "red_soft": "#F8E4E2",
+    "blue": "#426B8F",
+    "blue_soft": "#E7EEF5"
+  },
+  "radii_px": {
+    "small": 8,
+    "medium": 10,
+    "large": 12,
+    "card": 16,
+    "hero": 20,
+    "pill": 999
+  },
+  "layout_px": {
+    "sidebar_desktop": 236,
+    "main_padding_x": 32,
+    "main_padding_top": 28,
+    "grid_gap": 16,
+    "hero_padding": 23
+  },
+  "shadows": {
+    "card": "0 8px 24px rgba(24,32,27,.06)",
+    "button": "0 1px 2px rgba(0,0,0,.02)"
+  },
+  "typography": {
+    "font_stack": "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif",
+    "body_px": 14,
+    "eyebrow_px": 11,
+    "h1_px": 28,
+    "h2_px": 22,
+    "h3_px": 14,
+    "body_small_px": 12,
+    "table_px": 11,
+    "caption_px": 10
+  },
+  "breakpoints_px": {
+    "tablet": 1050,
+    "mobile": 700
+  }
+}
