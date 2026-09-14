@@ -1,0 +1,9 @@
+Domain services and business rules live here.
+
+Boundary rules:
+- Domain services run server-side only and are the only place that writes
+  production data. UI components must not contain domain rules.
+- Services own transactions, invariants, and authorization checks, so the
+  rules still hold when UI validation is bypassed.
+
+Empty on purpose: no domain service is part of the application foundation.
