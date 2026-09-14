@@ -1,0 +1,526 @@
+// Växa Production — V1 Prisma schema
+//
+// Scope: the approved 402 seeding vertical slice only.
+// Authority: docs/architecture/DATA_MODEL.md, docs/domain/BUSINESS_RULES.md and the
+// approved Prisma integrity gate.
+//
+// Entity stereotypes used in comments below:
+//   INTENT    planned values; never overwritten by actual production
+//   EXECUTION work/workflow state
+//   STATE     current operational state kept for fast reads
+//   HISTORY   immutable once committed
+//   SNAPSHOT  frozen copy of master data, taken at Start
+//
+// Constraints that PostgreSQL supports but Prisma schema cannot express are listed at
+// the bottom of this file and MUST be added as raw SQL in the first migration.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Enums
+// ---------------------------------------------------------------------------
+
+/// Physical cultivation/location state of a batch.
+/// The complete V1 cultivation lifecycle is:
+/// PLANNED -> GERMINATION -> NURSERY -> IN_TRANSIT -> IN_POOL -> HARVESTED
+/// V1 application code only performs PLANNED -> GERMINATION.
+/// Seeding and transplanting are actions/events, not stages.
+/// Post-harvest outcomes (packed/surplus/waste) are deferred and are NOT stages.
+enum BatchStage {
+  PLANNED
+  GERMINATION
+  NURSERY
+  IN_TRANSIT
+  IN_POOL
+  HARVESTED
+}
+
+/// Execution/workflow state of team work. Separate from BatchStage on purpose.
+enum ProductionTaskStatus {
+  OPEN
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+/// Only successful, committed operations create ProductionEvent rows.
+/// Future event types are added by later migrations, not now.
+enum ProductionEventType {
+  SEEDING_COMPLETED
+}
+
+/// Operational BOM types (docs/domain/MASTER_DATA_AND_BOM.md).
+enum BomType {
+  PROD
+  FG
+}
+
+/// docs/architecture/DATA_MODEL.md: plan status Draft/Published.
+enum WeeklyPlanStatus {
+  DRAFT
+  PUBLISHED
+}
+
+/// docs/domain/MASTER_DATA_AND_BOM.md: seed lot statuses are exactly these three.
+enum SeedLotStatus {
+  AVAILABLE
+  FINISHED
+  DISCONTINUED
+}
+
+// ---------------------------------------------------------------------------
+// Identity and teams
+// ---------------------------------------------------------------------------
+
+/// STATE. Operational group such as 402.
+model Team {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  memberships     UserTeam[]
+  planItems       PlanItem[]
+  productionTasks ProductionTask[]
+
+  @@map("teams")
+}
+
+/// STATE. One User entity covers worker attribution today and staff identity later.
+/// Users are never deleted once referenced by production history; deactivate instead.
+model User {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  teamMemberships           UserTeam[]
+  startedProductionTasks    ProductionTask[]   @relation("ProductionTaskStarter")
+  initiatedProductionEvents ProductionEvent[]  @relation("ProductionEventInitiator")
+  eventParticipations       EventParticipant[]
+
+  @@map("users")
+}
+
+/// STATE. Team membership drives the shared-device worker list.
+/// Membership is not authentication.
+model UserTeam {
+  userId    String   @map("user_id") @db.Uuid
+  teamId    String   @map("team_id") @db.Uuid
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Restrict)
+  team Team @relation(fields: [teamId], references: [id], onDelete: Restrict)
+
+  @@id([userId, teamId])
+  @@index([teamId])
+  @@map("user_teams")
+}
+
+// ---------------------------------------------------------------------------
+// Master data
+// ---------------------------------------------------------------------------
+
+/// INTENT/master data. Configured stage durations are planning parameters.
+/// DTM is derived from germination + nursery + growing days and is frozen onto a
+/// Batch at Start; a stage extension never rewrites these values.
+model Sku {
+  id                   String   @id @default(uuid()) @db.Uuid
+  code                 String   @unique
+  description          String?
+  primarySeedVarietyId String   @map("primary_seed_variety_id") @db.Uuid
+  germinationDays      Int      @map("germination_days")
+  nurseryDays          Int      @map("nursery_days")
+  growingDays          Int      @map("growing_days")
+  active               Boolean  @default(true)
+  createdAt            DateTime @default(now()) @map("created_at")
+  updatedAt            DateTime @updatedAt @map("updated_at")
+
+  primarySeedVariety SeedVariety @relation(fields: [primarySeedVarietyId], references: [id], onDelete: Restrict)
+
+  boms      Bom[]
+  planItems PlanItem[]
+  batches   Batch[]
+
+  @@map("skus")
+}
+
+/// Master data. Reusable seed identity.
+model SeedVariety {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  seedLots SeedLot[]
+  skus     Sku[]
+
+  @@map("seed_varieties")
+}
+
+/// Master data / traceability source.
+model SeedLot {
+  id             String        @id @default(uuid()) @db.Uuid
+  seedVarietyId  String        @map("seed_variety_id") @db.Uuid
+  lotNumber      String        @map("lot_number")
+  supplierName   String?       @map("supplier_name")
+  productionDate DateTime?     @map("production_date") @db.Date
+  deliveryDate   DateTime?     @map("delivery_date") @db.Date
+  status         SeedLotStatus
+  comments       String?
+  createdAt      DateTime      @default(now()) @map("created_at")
+  updatedAt      DateTime      @updatedAt @map("updated_at")
+
+  seedVariety SeedVariety @relation(fields: [seedVarietyId], references: [id], onDelete: Restrict)
+
+  eventLotAllocations EventLotAllocation[]
+
+  @@index([seedVarietyId])
+  @@map("seed_lots")
+}
+
+/// Master data. Central material master.
+model Material {
+  id            String   @id @default(uuid()) @db.Uuid
+  name          String
+  category      String?
+  unitOfMeasure String   @map("unit_of_measure")
+  active        Boolean  @default(true)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  materialLots MaterialLot[]
+  bomLines     BomLine[]
+
+  @@map("materials")
+}
+
+/// Master data / traceability source.
+/// Material lot status values are not fixed by the starter pack, so this stays a
+/// free-form nullable string until product defines the vocabulary.
+model MaterialLot {
+  id         String   @id @default(uuid()) @db.Uuid
+  materialId String   @map("material_id") @db.Uuid
+  lotNumber  String   @map("lot_number")
+  status     String?
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  material Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  eventLotAllocations EventLotAllocation[]
+
+  @@index([materialId])
+  @@map("material_lots")
+}
+
+/// INTENT/master data. Live operational recipe used for NEW production only.
+/// Exactly one active BOM per (sku, type) — enforced by a partial unique index in SQL.
+/// Started batches keep their own frozen copy in Batch.bomSnapshot.
+model Bom {
+  id        String   @id @default(uuid()) @db.Uuid
+  skuId     String   @map("sku_id") @db.Uuid
+  type      BomType
+  active    Boolean  @default(true)
+  ready     Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sku   Sku       @relation(fields: [skuId], references: [id], onDelete: Restrict)
+  lines BomLine[]
+
+  @@map("boms")
+}
+
+/// INTENT/master data. Theoretical quantity per one production unit.
+model BomLine {
+  id            String   @id @default(uuid()) @db.Uuid
+  bomId         String   @map("bom_id") @db.Uuid
+  materialId    String   @map("material_id") @db.Uuid
+  qtyPerUnit    Decimal  @map("qty_per_unit") @db.Decimal(12, 3)
+  unitOfMeasure String   @map("unit_of_measure")
+  sortIndex     Int      @default(0) @map("sort_index")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  bom      Bom      @relation(fields: [bomId], references: [id], onDelete: Cascade)
+  material Material @relation(fields: [materialId], references: [id], onDelete: Restrict)
+
+  @@index([bomId])
+  @@map("bom_lines")
+}
+
+// ---------------------------------------------------------------------------
+// Planning (INTENT)
+// ---------------------------------------------------------------------------
+
+/// INTENT. Weekly planning container.
+model WeeklyPlan {
+  id        String           @id @default(uuid()) @db.Uuid
+  week      String
+  status    WeeklyPlanStatus @default(DRAFT)
+  createdAt DateTime         @default(now()) @map("created_at")
+  updatedAt DateTime         @updatedAt @map("updated_at")
+
+  planItems PlanItem[]
+
+  @@map("weekly_plans")
+}
+
+/// INTENT. Planned work. plannedQuantity and destinationIdentity are never
+/// overwritten by execution; actuals live on ProductionEvent.
+model PlanItem {
+  id                  String   @id @default(uuid()) @db.Uuid
+  planId              String   @map("plan_id") @db.Uuid
+  skuId               String   @map("sku_id") @db.Uuid
+  assignedTeamId      String   @map("assigned_team_id") @db.Uuid
+  plannedDate         DateTime @map("planned_date") @db.Date
+  plannedQuantity     Decimal  @map("planned_quantity") @db.Decimal(12, 3)
+  quantityUom         String   @map("quantity_uom")
+  destinationIdentity String   @map("destination_identity")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  plan         WeeklyPlan @relation(fields: [planId], references: [id], onDelete: Restrict)
+  sku          Sku        @relation(fields: [skuId], references: [id], onDelete: Restrict)
+  assignedTeam Team       @relation(fields: [assignedTeamId], references: [id], onDelete: Restrict)
+
+  /// A PlanItem has zero or one Batch (Batch.originPlanItemId is required + unique).
+  batch           Batch?
+  productionTasks ProductionTask[]
+
+  @@index([assignedTeamId, plannedDate])
+  @@index([planId])
+  @@map("plan_items")
+}
+
+// ---------------------------------------------------------------------------
+// Batch identity and current state
+// ---------------------------------------------------------------------------
+
+/// STATE + SNAPSHOT. Physical production identity.
+///
+/// Operational identity is sku + visibleBatchNumber; the immutable internal key is id.
+/// officialIdentityLockedAt IS NULL means identity is still preparable.
+/// Once Start sets that timestamp, domain services must refuse changes to
+/// visibleBatchNumber, originalAssignedDestination, the timing snapshots and bomSnapshot.
+/// Enforcement is application-level by design; no database triggers.
+///
+/// A batch stays permanently traceable after reaching HARVESTED, so future
+/// post-harvest outcome records can reference it without replacing its identity.
+model Batch {
+  id                          String     @id @default(uuid()) @db.Uuid
+  skuId                       String     @map("sku_id") @db.Uuid
+  originPlanItemId            String     @unique @map("origin_plan_item_id") @db.Uuid
+  visibleBatchNumber          String     @map("visible_batch_number")
+  originalAssignedDestination String     @map("original_assigned_destination")
+  currentStage                BatchStage @default(PLANNED) @map("current_stage")
+  officialIdentityLockedAt    DateTime?  @map("official_identity_locked_at")
+
+  /// SNAPSHOT: frozen at Start, null before Start. A stage extension never changes these.
+  germinationDaysSnapshot Int? @map("germination_days_snapshot")
+  nurseryDaysSnapshot     Int? @map("nursery_days_snapshot")
+  growingDaysSnapshot     Int? @map("growing_days_snapshot")
+  dtmDaysSnapshot         Int? @map("dtm_days_snapshot")
+
+  /// SNAPSHOT: frozen BOM at Start. Logical shape validated by Zod in the domain layer:
+  /// { sourceBomId, type, ready, lines: [{ materialId, materialName, qtyPerUnit, uom }] }
+  bomSnapshot Json? @map("bom_snapshot") @db.JsonB
+
+  /// STATE: expected germination assessment date, set at seeding commit from
+  /// germinationDaysSnapshot. May move later (extension) without changing DTM.
+  expectedGerminationAt DateTime? @map("expected_germination_at")
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  sku            Sku      @relation(fields: [skuId], references: [id], onDelete: Restrict)
+  originPlanItem PlanItem @relation(fields: [originPlanItemId], references: [id], onDelete: Restrict)
+
+  productionTasks  ProductionTask[]
+  productionEvents ProductionEvent[]
+
+  @@unique([skuId, visibleBatchNumber])
+  @@map("batches")
+}
+
+// ---------------------------------------------------------------------------
+// Execution and immutable history
+// ---------------------------------------------------------------------------
+
+/// EXECUTION. Actionable team work derived from planning.
+/// Locked with SELECT ... FOR UPDATE during the Complete transaction.
+model ProductionTask {
+  id             String               @id @default(uuid()) @db.Uuid
+  planItemId     String               @map("plan_item_id") @db.Uuid
+  batchId        String               @map("batch_id") @db.Uuid
+  assignedTeamId String               @map("assigned_team_id") @db.Uuid
+  /// Initiating worker: null until Start, required by domain services afterwards.
+  starterUserId  String?              @map("starter_user_id") @db.Uuid
+  status         ProductionTaskStatus @default(OPEN)
+  startedAt      DateTime?            @map("started_at")
+  completedAt    DateTime?            @map("completed_at")
+
+  /// SNAPSHOT: preselected lots frozen at Start. Logical shape validated by Zod:
+  /// [{ lotType: "SEED" | "MATERIAL", seedLotId?, materialLotId?, lotNumber }]
+  /// Exactly one of seedLotId/materialLotId per element. No quantities here.
+  preselectedLots Json? @map("preselected_lots") @db.JsonB
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  planItem     PlanItem @relation(fields: [planItemId], references: [id], onDelete: Restrict)
+  batch        Batch    @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  assignedTeam Team     @relation(fields: [assignedTeamId], references: [id], onDelete: Restrict)
+  starterUser  User?    @relation("ProductionTaskStarter", fields: [starterUserId], references: [id], onDelete: Restrict)
+
+  productionEvents ProductionEvent[]
+
+  @@index([assignedTeamId, status])
+  @@index([batchId])
+  @@map("production_tasks")
+}
+
+/// HISTORY. Immutable record of what physically happened.
+/// Rows are created only by a successful committed operation; a failed Complete
+/// writes nothing, so it can never block a later legitimate success.
+/// plannedQuantitySnapshot is copied from the PlanItem at commit time.
+///
+/// Two partial unique indexes (see the SQL block at the end of this file) protect
+/// seeding: one SEEDING_COMPLETED per task, and one SEEDING_COMPLETED per batch.
+/// The batch-scoped index is what makes a duplicate seeding task harmless: a batch
+/// can be seeded only once, while still allowing many later tasks and many later
+/// events of other types on the same batch.
+model ProductionEvent {
+  id                      String              @id @default(uuid()) @db.Uuid
+  batchId                 String              @map("batch_id") @db.Uuid
+  productionTaskId        String              @map("production_task_id") @db.Uuid
+  initiatedByUserId       String              @map("initiated_by_user_id") @db.Uuid
+  eventType               ProductionEventType @map("event_type")
+  plannedQuantitySnapshot Decimal             @map("planned_quantity_snapshot") @db.Decimal(12, 3)
+  actualQuantity          Decimal             @map("actual_quantity") @db.Decimal(12, 3)
+  quantityUom             String              @map("quantity_uom")
+  stageBefore             BatchStage          @map("stage_before")
+  stageAfter              BatchStage          @map("stage_after")
+  occurredAt              DateTime            @map("occurred_at")
+  createdAt               DateTime            @default(now()) @map("created_at")
+
+  batch           Batch          @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  productionTask  ProductionTask @relation(fields: [productionTaskId], references: [id], onDelete: Restrict)
+  initiatedByUser User           @relation("ProductionEventInitiator", fields: [initiatedByUserId], references: [id], onDelete: Restrict)
+
+  participants   EventParticipant[]
+  lotAllocations EventLotAllocation[]
+  deviation      Deviation?
+
+  @@index([batchId])
+  @@index([productionTaskId])
+  @@map("production_events")
+}
+
+/// HISTORY. Workers attributed to a specific physical event.
+/// The initiating worker is also recorded here by the domain service.
+model EventParticipant {
+  eventId   String   @map("event_id") @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  event ProductionEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  user  User            @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([eventId, userId])
+  @@map("event_participants")
+}
+
+/// HISTORY. Actual lot usage. Exactly one of seedLotId/materialLotId is populated
+/// (CHECK constraint in SQL). Allocations must reconcile to actualQuantity — that
+/// reconciliation is a domain rule, not a database constraint.
+/// A lot may appear on many events, but only once per event.
+model EventLotAllocation {
+  id                    String   @id @default(uuid()) @db.Uuid
+  eventId               String   @map("event_id") @db.Uuid
+  seedLotId             String?  @map("seed_lot_id") @db.Uuid
+  materialLotId         String?  @map("material_lot_id") @db.Uuid
+  quantity              Decimal  @db.Decimal(12, 3)
+  quantityUom           String   @map("quantity_uom")
+  changeFromPreselected Boolean  @default(false) @map("change_from_preselected")
+  changeReason          String?  @map("change_reason")
+  notes                 String?
+  createdAt             DateTime @default(now()) @map("created_at")
+
+  event       ProductionEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  seedLot     SeedLot?        @relation(fields: [seedLotId], references: [id], onDelete: Restrict)
+  materialLot MaterialLot?    @relation(fields: [materialLotId], references: [id], onDelete: Restrict)
+
+  /// In PostgreSQL NULLs never conflict, so these behave as the intended
+  /// "same lot at most once per event" partial uniqueness.
+  @@unique([eventId, seedLotId])
+  @@unique([eventId, materialLotId])
+  @@index([eventId])
+  @@map("event_lot_allocations")
+}
+
+/// HISTORY. At most one quantity deviation per V1 production event.
+/// reasonCode vocabularies are defined in docs/domain/BUSINESS_RULES.md and are
+/// validated in the domain layer.
+model Deviation {
+  id                String   @id @default(uuid()) @db.Uuid
+  productionEventId String   @unique @map("production_event_id") @db.Uuid
+  reasonCode        String   @map("reason_code")
+  explanation       String?
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  productionEvent ProductionEvent @relation(fields: [productionEventId], references: [id], onDelete: Cascade)
+
+  @@map("deviations")
+}
+
+// ---------------------------------------------------------------------------
+// REQUIRED RAW SQL (first migration) — Prisma schema cannot express these
+// ---------------------------------------------------------------------------
+//
+// 1. One active BOM per SKU and type:
+//    CREATE UNIQUE INDEX boms_active_sku_type_key
+//      ON boms (sku_id, type) WHERE active;
+//
+// 2. One successful seeding event per production task (must stay partial so later
+//    workflows can record several events of the same type on one task):
+//    CREATE UNIQUE INDEX production_events_seeding_completed_task_key
+//      ON production_events (production_task_id)
+//      WHERE event_type = 'SEEDING_COMPLETED';
+//
+// 2b. One successful seeding event per batch. A batch is seeded exactly once, so this
+//    makes a duplicate seeding task unable to double-seed the same physical material.
+//    It must also stay partial: a batch legitimately gets many later tasks and many
+//    later events of other types.
+//    CREATE UNIQUE INDEX production_events_seeding_completed_batch_key
+//      ON production_events (batch_id)
+//      WHERE event_type = 'SEEDING_COMPLETED';
+//
+// 3. Lot XOR on allocations:
+//    ALTER TABLE event_lot_allocations
+//      ADD CONSTRAINT event_lot_allocations_lot_xor
+//      CHECK ((seed_lot_id IS NULL) <> (material_lot_id IS NULL));
+//
+// 4. Positive quantities:
+//    ALTER TABLE plan_items
+//      ADD CONSTRAINT plan_items_planned_quantity_positive CHECK (planned_quantity > 0);
+//    ALTER TABLE production_events
+//      ADD CONSTRAINT production_events_planned_quantity_positive CHECK (planned_quantity_snapshot > 0),
+//      ADD CONSTRAINT production_events_actual_quantity_positive CHECK (actual_quantity > 0);
+//    ALTER TABLE event_lot_allocations
+//      ADD CONSTRAINT event_lot_allocations_quantity_positive CHECK (quantity > 0);
+//    ALTER TABLE bom_lines
+//      ADD CONSTRAINT bom_lines_qty_per_unit_positive CHECK (qty_per_unit > 0);
