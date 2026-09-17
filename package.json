@@ -11,12 +11,17 @@
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
+    "test": "dotenv -e .env.local -- vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
     "prisma:generate": "prisma generate",
     "prisma:status": "dotenv -e .env.local -- prisma migrate status",
-    "prisma:deploy": "dotenv -e .env.local -- prisma migrate deploy"
+    "prisma:deploy": "dotenv -e .env.local -- prisma migrate deploy",
+    "db:seed": "dotenv -e .env.local -- npx tsx prisma/seed.ts",
+    "db:import-skus": "dotenv -e .env.local -- npx tsx scripts/import-sku-master-data.ts"
+  },
+  "prisma": {
+    "seed": "dotenv -e .env.local -- npx tsx prisma/seed.ts"
   },
   "dependencies": {
     "@prisma/client": "6.19.3",
@@ -37,7 +42,9 @@
     "eslint-config-next": "16.3.5",
     "prisma": "6.19.3",
     "tailwindcss": "4.3.3",
+    "tsx": "4.20.5",
     "typescript": "5.9.3",
-    "vitest": "3.2.7"
+    "vitest": "3.2.7",
+    "xlsx": "^0.18.5"
   }
 }

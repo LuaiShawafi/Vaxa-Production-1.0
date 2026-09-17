@@ -136,16 +136,26 @@ model UserTeam {
 /// DTM is derived from germination + nursery + growing days and is frozen onto a
 /// Batch at Start; a stage extension never rewrites these values.
 model Sku {
-  id                   String   @id @default(uuid()) @db.Uuid
-  code                 String   @unique
-  description          String?
-  primarySeedVarietyId String   @map("primary_seed_variety_id") @db.Uuid
-  germinationDays      Int      @map("germination_days")
-  nurseryDays          Int      @map("nursery_days")
-  growingDays          Int      @map("growing_days")
-  active               Boolean  @default(true)
-  createdAt            DateTime @default(now()) @map("created_at")
-  updatedAt            DateTime @updatedAt @map("updated_at")
+  id                     String   @id @default(uuid()) @db.Uuid
+  code                   String   @unique
+  description            String?
+  category               String?
+  growingMethod          String?  @map("growing_method")
+  nurseryDensityPerM2    Decimal? @map("nursery_density_per_m2") @db.Decimal(14, 6)
+  finalDensityPerM2      Decimal? @map("final_density_per_m2") @db.Decimal(14, 6)
+  averageUnitWeightGrams Decimal? @map("average_unit_weight_grams") @db.Decimal(12, 3)
+  seedsPerUnit           Decimal? @map("seeds_per_unit") @db.Decimal(14, 6)
+  seedMeasure            String?  @map("seed_measure")
+  seedSupplierName       String?  @map("seed_supplier_name")
+  harvestsPerYear        Int?     @map("harvests_per_year")
+  dtmTotalDays           Int?     @map("dtm_total_days")
+  primarySeedVarietyId   String   @map("primary_seed_variety_id") @db.Uuid
+  germinationDays        Int      @map("germination_days")
+  nurseryDays            Int?     @map("nursery_days")
+  growingDays            Int      @map("growing_days")
+  active                 Boolean  @default(true)
+  createdAt              DateTime @default(now()) @map("created_at")
+  updatedAt              DateTime @updatedAt @map("updated_at")
 
   primarySeedVariety SeedVariety @relation(fields: [primarySeedVarietyId], references: [id], onDelete: Restrict)
 
