@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
+import { Inter } from "next/font/google";
+import { AppShell } from "@/components/layout/AppShell";
 import "./globals.css";
+
+const inter = Inter({
+  subsets: ["latin"],
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   title: "Växa Production",
@@ -17,8 +24,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="en">
-      <body className="bg-background text-text font-sans antialiased">
-        {children}
+      <body
+        className={`${inter.className} bg-background text-text font-sans antialiased`}
+      >
+        <AppShell>{children}</AppShell>
       </body>
     </html>
   );
