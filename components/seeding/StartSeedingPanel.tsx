@@ -34,76 +34,112 @@ export function StartSeedingPanel({
     return null;
   }
 
+  const selectedName = members.find((m) => m.id === workerId)?.name ?? null;
+  const canSubmit = Boolean(workerId) && !pending;
+
   return (
-    <Card className="mt-6 p-5">
+    <Card className="flex h-full flex-col p-5 sm:p-6">
       <SectionHeader
         title="Who are you?"
-        lead="Shared 402 production device — team members assigned to 402 appear here."
+        lead="Shared 402 production device — select your name to start."
       />
-      <ChoiceGrid
-        choices={members.map((m) => ({ id: m.id, label: m.name }))}
-        selectedId={workerId}
-        onSelect={setWorkerId}
-        density="production"
-      />
-      {error ? <p className="mt-3 text-red">{error}</p> : null}
+
+      {members.length === 0 ? (
+        <p className="text-body-small text-muted" role="status">
+          No 402 team members are available. Ask CS/CL to assign workers to
+          team 402.
+        </p>
+      ) : (
+        <ChoiceGrid
+          aria-label="Who are you?"
+          choices={members.map((m) => ({ id: m.id, label: m.name }))}
+          selectedId={workerId}
+          onSelect={(id) => {
+            setWorkerId(id);
+            setError(null);
+          }}
+          density="production"
+        />
+      )}
+
+      {selectedName ? (
+        <p className="mt-3 text-body-small text-muted" aria-live="polite">
+          Starting as{" "}
+          <span className="font-semibold text-text">{selectedName}</span>
+        </p>
+      ) : (
+        <p className="mt-3 text-body-small text-muted">
+          Select your name before starting.
+        </p>
+      )}
+
+      {error ? (
+        <p className="mt-3 text-body-small font-semibold text-red" role="alert">
+          {error}
+        </p>
+      ) : null}
+
       {conflict ? (
-        <Card className="mt-3 border-amber bg-amber-soft p-4">
+        <div
+          className="mt-3 rounded-lg border border-amber bg-amber-soft p-4"
+          role="status"
+        >
           <p className="font-semibold text-amber-text">
             Already started by {conflict.starterName}
           </p>
-          <p className="text-body-small text-muted">
+          <p className="mt-1 text-body-small text-muted">
             Started at {conflict.startedAt}. You can open the task to continue
             work, but cannot take over as starter.
           </p>
-          <LinkToTask taskId={taskId} />
-        </Card>
+          <a
+            href={`/402/seeding/${taskId}`}
+            className="mt-2 inline-block text-body-small font-semibold text-green underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-green"
+          >
+            View in-progress task
+          </a>
+        </div>
       ) : null}
-      <Button
-        className="mt-4 w-full sm:w-auto"
-        variant="primary"
-        density="production"
-        disabled={!workerId || pending}
-        onClick={() => {
-          if (!workerId) {
-            setError("Select your name before starting.");
-            return;
-          }
-          setError(null);
-          setConflict(null);
-          startTransition(async () => {
-            const result = await startSeedingAction({
-              productionTaskId: taskId,
-              teamId,
-              workerUserId: workerId,
-            });
-            if (!result.ok) {
-              if (result.kind === "conflict" && result.details) {
-                setConflict({
-                  starterName: String(result.details.starterName),
-                  startedAt: new Date(
-                    String(result.details.startedAt),
-                  ).toLocaleString(),
-                });
-                return;
-              }
-              setError(result.message);
+
+      <div className="mt-auto pt-5">
+        <Button
+          className="w-full font-bold"
+          variant="primary"
+          density="production"
+          disabled={!canSubmit}
+          aria-disabled={!canSubmit}
+          onClick={() => {
+            if (!workerId) {
+              setError("Select your name before starting.");
               return;
             }
-            router.refresh();
-          });
-        }}
-      >
-        Start Seeding
-      </Button>
+            setError(null);
+            setConflict(null);
+            startTransition(async () => {
+              const result = await startSeedingAction({
+                productionTaskId: taskId,
+                teamId,
+                workerUserId: workerId,
+              });
+              if (!result.ok) {
+                if (result.kind === "conflict" && result.details) {
+                  setConflict({
+                    starterName: String(result.details.starterName),
+                    startedAt: new Date(
+                      String(result.details.startedAt),
+                    ).toLocaleString(),
+                  });
+                  return;
+                }
+                setError(result.message);
+                return;
+              }
+              router.refresh();
+            });
+          }}
+        >
+          {pending ? "Starting…" : "Start Seeding"}
+        </Button>
+      </div>
     </Card>
-  );
-}
-
-function LinkToTask({ taskId }: { taskId: string }) {
-  return (
-    <a href={`/402/seeding/${taskId}`} className="mt-2 inline-block text-green underline">
-      View in-progress task
-    </a>
   );
 }
