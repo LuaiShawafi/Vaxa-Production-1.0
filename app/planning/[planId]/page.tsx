@@ -1,9 +1,6 @@
 import { notFound } from "next/navigation";
-import { PublishPlanButton } from "@/components/planning/PublishPlanButton";
 import { PlanItemRowActions } from "@/components/planning/PlanItemRowActions";
-import { DevDeleteWeeklyPlanButton } from "@/components/planning/DevDeleteWeeklyPlanButton";
-import { ArchivePlanButton } from "@/components/planning/ArchivePlanButton";
-import { DeleteEmptyDraftPlanButton } from "@/components/planning/DeleteEmptyDraftPlanButton";
+import { WeeklyPlanDetailHeader } from "@/components/planning/WeeklyPlanDetailHeader";
 import {
   getWeeklyPlanDetail,
   listActiveSkus,
@@ -16,7 +13,6 @@ import { PlanItemForm } from "@/components/planning/PlanItemForm";
 import { formatDateInput, isoWeekPlanningDaySections } from "@/lib/date";
 import { planItemUiState } from "@/lib/planning/planItemUiState";
 import { ProductionTaskStatus, WeeklyPlanStatus } from "@prisma/client";
-import { PageHeader } from "@/components/layout/PageHeader";
 
 type PageProps = { params: Promise<{ planId: string }> };
 
@@ -33,8 +29,6 @@ export default async function PlanningDetailPage({ params }: PageProps) {
   ]);
 
   const isDraft = plan.status === WeeklyPlanStatus.DRAFT;
-  const isPublished = plan.status === WeeklyPlanStatus.PUBLISHED;
-  const isArchived = plan.status === WeeklyPlanStatus.ARCHIVED;
   const devDeletionEnabled =
     process.env.ENABLE_DEV_DATA_DELETION === "true";
 
@@ -50,54 +44,15 @@ export default async function PlanningDetailPage({ params }: PageProps) {
 
   return (
     <main className="mx-auto max-w-5xl">
-      <PageHeader
-        eyebrow="Planning"
-        title={`Week ${plan.week}`}
-        backLink={{ href: "/planning", label: "← Weekly plans" }}
-        status={
-          <div className="flex flex-wrap items-center gap-2">
-            <Pill
-              tone={
-                isDraft ? "blue" : isArchived ? "amber" : "green"
-              }
-            >
-              {plan.status}
-            </Pill>
-            {devDeletionEnabled ? (
-              <DevDeleteWeeklyPlanButton planId={plan.id} />
-            ) : null}
-          </div>
-        }
+      <WeeklyPlanDetailHeader
+        planId={plan.id}
+        week={plan.week}
+        status={plan.status}
+        itemCount={plan.planItems.length}
+        devDeletionEnabled={devDeletionEnabled}
       />
 
-      {isDraft && plan.planItems.length === 0 ? (
-        <div className="mt-4">
-          <DeleteEmptyDraftPlanButton planId={plan.id} />
-        </div>
-      ) : null}
-
-      {isPublished ? (
-        <div className="mt-4">
-          <ArchivePlanButton planId={plan.id} />
-        </div>
-      ) : null}
-
-      {isDraft ? (
-        <div className="mt-6">
-          <PublishPlanButton planId={plan.id} itemCount={plan.planItems.length} />
-        </div>
-      ) : null}
-
-      <SectionHeader
-        title="Weekly plan"
-        lead={
-          isArchived
-            ? "Archived — read-only history"
-            : isDraft
-              ? "Add items by day, then publish"
-              : "OPEN items remain editable until Start"
-        }
-      />
+      <SectionHeader title="Weekly plan" />
 
       <div className="mt-6 space-y-8">
         {weekdaySections.map((section) => {

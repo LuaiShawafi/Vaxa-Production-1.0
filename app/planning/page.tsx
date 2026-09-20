@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { listWeeklyPlans } from "@/lib/db/queries/planning";
 import { Card } from "@/components/ui/Card";
-import { Pill } from "@/components/ui/Pill";
+import { WeeklyPlanStatusPill } from "@/components/planning/WeeklyPlanStatusPill";
 import { SectionHeader } from "@/components/ui/SectionHeader";
 import { CreateWeeklyPlanForm } from "@/components/planning/CreateWeeklyPlanForm";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -43,9 +43,7 @@ export default async function PlanningPage() {
                     {plan.itemCount} item{plan.itemCount === 1 ? "" : "s"}
                   </p>
                 </div>
-                <Pill tone={plan.status === "PUBLISHED" ? "green" : "blue"}>
-                  {plan.status}
-                </Pill>
+                <WeeklyPlanStatusPill status={plan.status} />
               </Card>
             </li>
           ))}

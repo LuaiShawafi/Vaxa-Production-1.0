@@ -14,7 +14,7 @@ export function ArchivePlanButton({ planId }: { planId: string }) {
     <div>
       <Button
         type="button"
-        variant="secondary"
+        variant="primary"
         disabled={pending}
         onClick={() => {
           if (

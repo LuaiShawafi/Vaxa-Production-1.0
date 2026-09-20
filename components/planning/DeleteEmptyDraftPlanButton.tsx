@@ -15,7 +15,9 @@ export function DeleteEmptyDraftPlanButton({ planId }: { planId: string }) {
       <Button
         type="button"
         variant="secondary"
+        className="border-red/40 text-red-text"
         disabled={pending}
+        aria-label="Delete empty draft plan"
         onClick={() => {
           if (!window.confirm("Delete this empty draft plan?")) {
             return;
