@@ -1,4 +1,5 @@
 import { notFound } from "next/navigation";
+import { PlanDayAddButton } from "@/components/planning/PlanDayAddButton";
 import { PlanItemEditController } from "@/components/planning/PlanItemEditController";
 import { PlanItemRowActions } from "@/components/planning/PlanItemRowActions";
 import { WeeklyPlanDetailHeader } from "@/components/planning/WeeklyPlanDetailHeader";
@@ -7,10 +8,8 @@ import {
   listActiveSkus,
   listActiveTeams,
 } from "@/lib/db/queries/planning";
-import { Card } from "@/components/ui/Card";
 import { Pill } from "@/components/ui/Pill";
 import { SectionHeader } from "@/components/ui/SectionHeader";
-import { PlanItemForm } from "@/components/planning/PlanItemForm";
 import { formatDateInput, isoWeekPlanningDaySections } from "@/lib/date";
 import { planItemUiState } from "@/lib/planning/planItemUiState";
 import { ProductionTaskStatus, WeeklyPlanStatus } from "@prisma/client";
@@ -71,15 +70,11 @@ export default async function PlanningDetailPage({ params }: PageProps) {
                   </h2>
 
                   {isDraft ? (
-                    <Card className="mt-3 p-5">
-                      <SectionHeader title={`Add to ${section.weekdayName}`} />
-                      <PlanItemForm
-                        planId={plan.id}
-                        skus={skus}
-                        teams={teams}
-                        defaultPlannedDate={section.dateInput}
-                      />
-                    </Card>
+                    <PlanDayAddButton
+                      dateInput={section.dateInput}
+                      weekdayName={section.weekdayName}
+                      dayLabel={section.dayLabel}
+                    />
                   ) : null}
 
                   {dayItems.length === 0 ? (
@@ -157,6 +152,7 @@ export default async function PlanningDetailPage({ params }: PageProps) {
                                     subject={
                                       uiState === "draft" || uiState === "open"
                                         ? {
+                                            kind: "edit",
                                             planItemId: item.id,
                                             skuId: item.sku.id,
                                             skuCode: item.sku.code,

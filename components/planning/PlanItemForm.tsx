@@ -111,7 +111,9 @@ export function PlanItemForm({
       className={stacked ? "min-h-11" : undefined}
       hint={
         stacked
-          ? "Must be a planning day in this ISO week. Changing the date moves this item to that weekday."
+          ? initial
+            ? "Must be a planning day in this ISO week. Changing the date moves this item to that weekday."
+            : "Must be a planning day in this ISO week."
           : undefined
       }
       defaultValue={
@@ -241,7 +243,7 @@ export function PlanItemForm({
             setError(result.message);
             return;
           }
-          if (!initial) {
+          if (!initial && showSubmit) {
             formEl.reset();
           }
           onDirtyChange?.(false);

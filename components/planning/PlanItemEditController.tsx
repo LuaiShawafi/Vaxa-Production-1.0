@@ -11,19 +11,19 @@ import {
 } from "react";
 import {
   PlanItemEditDrawer,
+  type PlanItemAddSubject,
+  type PlanItemDrawerSubject,
   type PlanItemEditSubject,
 } from "@/components/planning/PlanItemEditDrawer";
 
 type Sku = { id: string; code: string };
 type Team = { id: string; name: string };
 
-export type { PlanItemEditSubject };
+export type { PlanItemAddSubject, PlanItemDrawerSubject, PlanItemEditSubject };
 
 const PlanItemEditContext = createContext<{
-  openEdit: (
-    subject: PlanItemEditSubject,
-    trigger: HTMLElement | null,
-  ) => void;
+  openAdd: (subject: PlanItemAddSubject, trigger: HTMLElement | null) => void;
+  openEdit: (subject: PlanItemEditSubject, trigger: HTMLElement | null) => void;
 } | null>(null);
 
 export function usePlanItemEdit() {
@@ -46,12 +46,13 @@ export function PlanItemEditController({
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(false);
-  const [subject, setSubject] = useState<PlanItemEditSubject | null>(null);
+  const [subject, setSubject] = useState<PlanItemDrawerSubject | null>(null);
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState(false);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const scrollYRef = useRef(0);
   const returnItemIdRef = useRef<string | null>(null);
+  const returnAddDateRef = useRef<string | null>(null);
 
   const close = useCallback(() => {
     if (pending) {
@@ -62,11 +63,17 @@ export function PlanItemEditController({
     setDirty(false);
   }, [pending]);
 
-  const openEdit = useCallback(
-    (next: PlanItemEditSubject, trigger: HTMLElement | null) => {
+  const captureOpen = useCallback(
+    (next: PlanItemDrawerSubject, trigger: HTMLElement | null) => {
       restoreFocusRef.current = trigger;
-      returnItemIdRef.current = next.planItemId;
       scrollYRef.current = window.scrollY;
+      if (next.kind === "add") {
+        returnAddDateRef.current = next.dateInput;
+        returnItemIdRef.current = null;
+      } else {
+        returnItemIdRef.current = next.planItemId;
+        returnAddDateRef.current = null;
+      }
       setSubject(next);
       setDirty(false);
       setPending(false);
@@ -75,9 +82,24 @@ export function PlanItemEditController({
     [],
   );
 
+  const openAdd = useCallback(
+    (next: PlanItemAddSubject, trigger: HTMLElement | null) => {
+      captureOpen(next, trigger);
+    },
+    [captureOpen],
+  );
+
+  const openEdit = useCallback(
+    (next: PlanItemEditSubject, trigger: HTMLElement | null) => {
+      captureOpen(next, trigger);
+    },
+    [captureOpen],
+  );
+
   const onSuccess = useCallback(() => {
     const y = scrollYRef.current;
     const itemId = returnItemIdRef.current;
+    const addDate = returnAddDateRef.current;
     setDirty(false);
     setPending(false);
     setOpen(false);
@@ -88,6 +110,12 @@ export function PlanItemEditController({
         document
           .querySelector<HTMLElement>(`[data-plan-item-edit="${itemId}"]`)
           ?.focus();
+        return;
+      }
+      if (addDate) {
+        document
+          .querySelector<HTMLElement>(`[data-plan-item-add="${addDate}"]`)
+          ?.focus();
       }
     };
     requestAnimationFrame(restore);
@@ -95,7 +123,7 @@ export function PlanItemEditController({
     window.setTimeout(restore, 250);
   }, []);
 
-  const api = useMemo(() => ({ openEdit }), [openEdit]);
+  const api = useMemo(() => ({ openAdd, openEdit }), [openAdd, openEdit]);
 
   return (
     <PlanItemEditContext.Provider value={api}>

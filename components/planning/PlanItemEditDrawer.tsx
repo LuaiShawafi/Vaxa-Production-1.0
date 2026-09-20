@@ -11,7 +11,15 @@ import type { PlanItemUiState } from "@/lib/planning/planItemUiState";
 type Sku = { id: string; code: string };
 type Team = { id: string; name: string };
 
+export type PlanItemAddSubject = {
+  kind: "add";
+  dateInput: string;
+  weekdayName: string;
+  dayLabel: string;
+};
+
 export type PlanItemEditSubject = {
+  kind: "edit";
   planItemId: string;
   skuId: string;
   skuCode: string;
@@ -26,6 +34,8 @@ export type PlanItemEditSubject = {
   stateLabel: string;
   visibleBatchNumber: string | null;
 };
+
+export type PlanItemDrawerSubject = PlanItemAddSubject | PlanItemEditSubject;
 
 export function PlanItemEditDrawer({
   open,
@@ -45,7 +55,7 @@ export function PlanItemEditDrawer({
   planId: string;
   skus: Sku[];
   teams: Team[];
-  subject: PlanItemEditSubject | null;
+  subject: PlanItemDrawerSubject | null;
   dirty: boolean;
   pending: boolean;
   restoreFocusRef: MutableRefObject<HTMLElement | null>;
@@ -60,10 +70,11 @@ export function PlanItemEditDrawer({
     return null;
   }
 
+  const isAdd = subject.kind === "add";
   const stateTone =
-    subject.uiState === "locked"
+    !isAdd && subject.uiState === "locked"
       ? ("amber" as const)
-      : subject.uiState === "open"
+      : !isAdd && subject.uiState === "open"
         ? ("green" as const)
         : ("blue" as const);
 
@@ -71,18 +82,24 @@ export function PlanItemEditDrawer({
     <Drawer
       open={open}
       onClose={onClose}
-      eyebrow="Edit plan item"
-      title={subject.skuCode}
-      subtitle={`${subject.weekdayLabel} · ${subject.assignedTeamName} · ${subject.destinationIdentity}`}
+      eyebrow={isAdd ? "Add plan item" : "Edit plan item"}
+      title={isAdd ? subject.weekdayName : subject.skuCode}
+      subtitle={
+        isAdd
+          ? subject.dayLabel
+          : `${subject.weekdayLabel} · ${subject.assignedTeamName} · ${subject.destinationIdentity}`
+      }
       headerAside={
-        <div className="mt-2 flex flex-wrap items-center gap-2">
-          <Pill tone={stateTone}>{subject.stateLabel}</Pill>
-          {subject.visibleBatchNumber ? (
-            <span className="font-mono text-caption text-muted">
-              Batch {subject.visibleBatchNumber}
-            </span>
-          ) : null}
-        </div>
+        isAdd ? undefined : (
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <Pill tone={stateTone}>{subject.stateLabel}</Pill>
+            {subject.visibleBatchNumber ? (
+              <span className="font-mono text-caption text-muted">
+                Batch {subject.visibleBatchNumber}
+              </span>
+            ) : null}
+          </div>
+        )
       }
       closeDisabled={pending}
       closeOnOverlayClick={!dirty && !pending}
@@ -109,32 +126,48 @@ export function PlanItemEditDrawer({
             className="min-h-11"
             disabled={pending}
           >
-            {pending ? "Saving…" : "Save plan item"}
+            {pending ? "Saving…" : isAdd ? "Add plan item" : "Save plan item"}
           </Button>
         </div>
       }
     >
-      <PlanItemForm
-        key={subject.planItemId}
-        formId={formId}
-        layout="stack"
-        showSubmit={false}
-        planId={planId}
-        skus={skus}
-        teams={teams}
-        lockSku={subject.lockSku}
-        initial={{
-          planItemId: subject.planItemId,
-          skuId: subject.skuId,
-          plannedDate: parseDateInput(subject.plannedDateInput),
-          plannedQuantity: subject.plannedQuantity,
-          assignedTeamId: subject.assignedTeamId,
-          destinationIdentity: subject.destinationIdentity,
-        }}
-        onSuccess={onSuccess}
-        onDirtyChange={onDirtyChange}
-        onPendingChange={onPendingChange}
-      />
+      {isAdd ? (
+        <PlanItemForm
+          key={`add-${subject.dateInput}`}
+          formId={formId}
+          layout="stack"
+          showSubmit={false}
+          planId={planId}
+          skus={skus}
+          teams={teams}
+          defaultPlannedDate={subject.dateInput}
+          onSuccess={onSuccess}
+          onDirtyChange={onDirtyChange}
+          onPendingChange={onPendingChange}
+        />
+      ) : (
+        <PlanItemForm
+          key={subject.planItemId}
+          formId={formId}
+          layout="stack"
+          showSubmit={false}
+          planId={planId}
+          skus={skus}
+          teams={teams}
+          lockSku={subject.lockSku}
+          initial={{
+            planItemId: subject.planItemId,
+            skuId: subject.skuId,
+            plannedDate: parseDateInput(subject.plannedDateInput),
+            plannedQuantity: subject.plannedQuantity,
+            assignedTeamId: subject.assignedTeamId,
+            destinationIdentity: subject.destinationIdentity,
+          }}
+          onSuccess={onSuccess}
+          onDirtyChange={onDirtyChange}
+          onPendingChange={onPendingChange}
+        />
+      )}
     </Drawer>
   );
 }
