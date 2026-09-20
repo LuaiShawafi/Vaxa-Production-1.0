@@ -44,6 +44,16 @@ export function WeeklyPlanDetailHeader({
   const isArchived = status === WeeklyPlanStatus.ARCHIVED;
   const isEmptyDraft = isDraft && itemCount === 0;
 
+  const publishButton = isDraft ? (
+    <PublishPlanButton
+      planId={planId}
+      itemCount={itemCount}
+      confirmOpen={publishConfirmOpen}
+      onRequestConfirm={() => setPublishConfirmOpen(true)}
+      onConfirmClose={() => setPublishConfirmOpen(false)}
+    />
+  ) : null;
+
   return (
     <div className="mb-6 space-y-4">
       <PageHeader
@@ -67,26 +77,13 @@ export function WeeklyPlanDetailHeader({
                   {isEmptyDraft ? (
                     <DeleteEmptyDraftPlanButton planId={planId} />
                   ) : null}
-                  {isDraft && !publishConfirmOpen ? (
-                    <PublishPlanButton
-                      planId={planId}
-                      itemCount={itemCount}
-                      onRequestConfirm={() => setPublishConfirmOpen(true)}
-                    />
-                  ) : null}
+                  {!publishConfirmOpen ? publishButton : null}
                   {isPublished ? <ArchivePlanButton planId={planId} /> : null}
                 </div>
               )
         }
       />
-      {isDraft && publishConfirmOpen ? (
-        <PublishPlanButton
-          planId={planId}
-          itemCount={itemCount}
-          confirmOpen
-          onConfirmClose={() => setPublishConfirmOpen(false)}
-        />
-      ) : null}
+      {publishConfirmOpen ? publishButton : null}
     </div>
   );
 }

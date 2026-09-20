@@ -9,7 +9,6 @@ import {
   listActiveTeams,
 } from "@/lib/db/queries/planning";
 import { Pill } from "@/components/ui/Pill";
-import { SectionHeader } from "@/components/ui/SectionHeader";
 import { formatDateInput, isoWeekPlanningDaySections } from "@/lib/date";
 import { planItemUiState } from "@/lib/planning/planItemUiState";
 import { ProductionTaskStatus, WeeklyPlanStatus } from "@prisma/client";
@@ -56,31 +55,36 @@ export default async function PlanningDetailPage({ params }: PageProps) {
         devDeletionEnabled={devDeletionEnabled}
       />
 
-      <SectionHeader title="Weekly plan" />
-
       <PlanItemEditController planId={plan.id} skus={skus} teams={teams}>
-        <div className="mt-6 space-y-8">
+        <div className="space-y-2">
             {weekdaySections.map((section) => {
               const dayItems = itemsByDate.get(section.dateInput) ?? [];
+              const isEmpty = dayItems.length === 0;
 
               return (
-                <section key={section.dateInput}>
-                  <h2 className="text-h3 font-bold">
-                    {section.weekdayName} — {section.dayLabel}
-                  </h2>
+                <section
+                  key={section.dateInput}
+                  className={isEmpty ? undefined : "pb-4"}
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+                    <h2 className="text-h3 font-bold">
+                      {section.weekdayName} — {section.dayLabel}
+                    </h2>
+                    {isDraft ? (
+                      <PlanDayAddButton
+                        dateInput={section.dateInput}
+                        weekdayName={section.weekdayName}
+                        dayLabel={section.dayLabel}
+                      />
+                    ) : null}
+                  </div>
 
-                  {isDraft ? (
-                    <PlanDayAddButton
-                      dateInput={section.dateInput}
-                      weekdayName={section.weekdayName}
-                      dayLabel={section.dayLabel}
-                    />
-                  ) : null}
-
-                  {dayItems.length === 0 ? (
-                    <p className="mt-2 text-muted text-body-small">
-                      No items planned.
-                    </p>
+                  {isEmpty ? (
+                    isDraft ? null : (
+                      <p className="mt-1 text-muted text-body-small">
+                        No items planned.
+                      </p>
+                    )
                   ) : (
                     <div className="mt-3 overflow-x-auto rounded-card border border-line bg-surface">
                       <table className="w-full text-table">

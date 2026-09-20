@@ -28,7 +28,8 @@ export function PublishPlanButton({
   const [pending, startTransition] = useTransition();
   const [internalConfirm, setInternalConfirm] = useState(false);
 
-  const showConfirm = onRequestConfirm ? confirmOpen : internalConfirm;
+  const isControlled = onRequestConfirm != null || onConfirmClose != null;
+  const showConfirm = isControlled ? confirmOpen : internalConfirm;
 
   const closeConfirm = () => {
     if (onConfirmClose) {
