@@ -3,38 +3,29 @@
 import { useState } from "react";
 import { DeletePlanItemButton } from "@/components/planning/DeletePlanItemButton";
 import { DevDeletePlanItemButton } from "@/components/planning/DevDeletePlanItemButton";
-import { PlanItemForm } from "@/components/planning/PlanItemForm";
+import {
+  usePlanItemEdit,
+  type PlanItemEditSubject,
+} from "@/components/planning/PlanItemEditController";
 import { Button } from "@/components/ui/Button";
 import type { PlanItemUiState } from "@/lib/planning/planItemUiState";
-
-type Sku = { id: string; code: string };
-type Team = { id: string; name: string };
 
 export function PlanItemRowActions({
   planId,
   uiState,
   devDeletionEnabled,
   batchId,
-  item,
-  skus,
-  teams,
+  planItemId,
+  subject,
 }: {
   planId: string;
   uiState: PlanItemUiState;
   devDeletionEnabled: boolean;
   batchId: string | null;
-  item: {
-    id: string;
-    skuId: string;
-    plannedDate: Date;
-    plannedQuantity: string;
-    assignedTeamId: string;
-    destinationIdentity: string;
-  };
-  skus: Sku[];
-  teams: Team[];
+  planItemId: string;
+  subject: PlanItemEditSubject | null;
 }) {
-  const [editing, setEditing] = useState(false);
+  const { openEdit } = usePlanItemEdit();
   const canEdit = uiState === "draft" || uiState === "open";
   const canDelete = uiState === "draft" || uiState === "open";
 
@@ -43,41 +34,26 @@ export function PlanItemRowActions({
   }
 
   return (
-    <div className="space-y-2">
-      {canEdit ? (
+    <div className="flex flex-wrap items-center gap-1.5">
+      {canEdit && subject ? (
         <Button
           type="button"
           variant="secondary"
-          onClick={() => setEditing((v) => !v)}
+          className="px-3"
+          data-plan-item-edit={planItemId}
+          onClick={(event) => openEdit(subject, event.currentTarget)}
         >
-          {editing ? "Cancel edit" : "Edit"}
+          Edit
         </Button>
       ) : null}
       {canDelete ? (
-        <DeletePlanItemButton planItemId={item.id} planId={planId} />
+        <DeletePlanItemButton planItemId={planItemId} planId={planId} />
       ) : null}
       {devDeletionEnabled && uiState === "locked" ? (
-        <DevDeletePlanItemButton planItemId={item.id} planId={planId} />
+        <DevDeletePlanItemButton planItemId={planItemId} planId={planId} />
       ) : null}
       {devDeletionEnabled && batchId && uiState !== "draft" ? (
         <DevDeleteBatchButton batchId={batchId} />
-      ) : null}
-      {editing && canEdit ? (
-        <PlanItemForm
-          planId={planId}
-          skus={skus}
-          teams={teams}
-          lockSku={uiState === "open"}
-          initial={{
-            planItemId: item.id,
-            skuId: item.skuId,
-            plannedDate: item.plannedDate,
-            plannedQuantity: item.plannedQuantity,
-            assignedTeamId: item.assignedTeamId,
-            destinationIdentity: item.destinationIdentity,
-          }}
-          onSuccess={() => setEditing(false)}
-        />
       ) : null}
     </div>
   );

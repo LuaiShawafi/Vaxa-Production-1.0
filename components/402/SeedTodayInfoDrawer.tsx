@@ -1,8 +1,7 @@
 "use client";
 
-import { useEffect, useId, useRef } from "react";
 import Link from "next/link";
-import { Button } from "@/components/ui/Button";
+import { Drawer } from "@/components/ui/Drawer";
 import { Pill } from "@/components/ui/Pill";
 import type { SeedTodayTaskInfo } from "@/lib/types/seedTodayTaskInfo";
 
@@ -27,101 +26,32 @@ export function SeedTodayInfoDrawer({
   info,
   onClose,
 }: SeedTodayInfoDrawerProps) {
-  const titleId = useId();
-  const panelRef = useRef<HTMLElement>(null);
-  const previouslyFocused = useRef<HTMLElement | null>(null);
-
-  useEffect(() => {
-    if (!open) return;
-
-    previouslyFocused.current =
-      document.activeElement instanceof HTMLElement
-        ? document.activeElement
-        : null;
-
-    const previousOverflow = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-
-    const focusTimer = window.setTimeout(() => {
-      panelRef.current?.focus();
-    }, 0);
-
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.key === "Escape") {
-        event.preventDefault();
-        onClose();
-      }
-    }
-
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      window.clearTimeout(focusTimer);
-      document.removeEventListener("keydown", onKeyDown);
-      document.body.style.overflow = previousOverflow;
-      previouslyFocused.current?.focus();
-    };
-  }, [open, onClose]);
-
-  if (!open) {
-    return null;
-  }
-
   return (
-    <div
-      className="fixed inset-0 z-[80] bg-[rgba(18,26,21,0.22)]"
-      role="presentation"
-      onClick={onClose}
+    <Drawer
+      open={open}
+      onClose={onClose}
+      eyebrow="Information"
+      title={info ? `Batch ${info.batchNumber}` : "Batch info"}
+      trapFocus={false}
+      initialFocus="panel"
+      closeDensity="production"
+      closeClassName="min-h-12 shrink-0 px-4 font-bold"
     >
-      <aside
-        ref={panelRef}
-        tabIndex={-1}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        className="absolute inset-y-0 right-0 flex h-full w-full max-w-[min(560px,94vw)] flex-col border-l border-line bg-surface shadow-[-20px_0_55px_rgba(0,0,0,0.12)] outline-none"
-        onClick={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-start justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0">
-            <p className="text-eyebrow font-extrabold tracking-[0.12em] text-muted uppercase">
-              Information
-            </p>
-            <h2
-              id={titleId}
-              className="mt-1 truncate text-h2 font-extrabold tracking-[-0.02em]"
-            >
-              {info ? `Batch ${info.batchNumber}` : "Batch info"}
-            </h2>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            density="production"
-            className="min-h-12 shrink-0 px-4 font-bold"
-            onClick={onClose}
-          >
-            Close
-          </Button>
+      {loading ? (
+        <p className="text-body text-muted">Loading batch information…</p>
+      ) : null}
+
+      {!loading && error ? (
+        <div className="rounded-lg border border-red-soft bg-red-soft/40 p-4">
+          <p className="text-body-small font-bold text-red-text">
+            Could not load info
+          </p>
+          <p className="mt-1 text-body-small text-muted">{error}</p>
         </div>
+      ) : null}
 
-        <div className="flex-1 overflow-y-auto px-5 py-4">
-          {loading ? (
-            <p className="text-body text-muted">Loading batch information…</p>
-          ) : null}
-
-          {!loading && error ? (
-            <div className="rounded-lg border border-red-soft bg-red-soft/40 p-4">
-              <p className="text-body-small font-bold text-red-text">
-                Could not load info
-              </p>
-              <p className="mt-1 text-body-small text-muted">{error}</p>
-            </div>
-          ) : null}
-
-          {!loading && !error && info ? <DrawerBody info={info} /> : null}
-        </div>
-      </aside>
-    </div>
+      {!loading && !error && info ? <DrawerBody info={info} /> : null}
+    </Drawer>
   );
 }
 
