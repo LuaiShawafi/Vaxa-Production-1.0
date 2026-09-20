@@ -14,11 +14,14 @@
     "test": "dotenv -e .env.local -- vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
+    "postinstall": "prisma generate",
     "prisma:generate": "prisma generate",
     "prisma:status": "dotenv -e .env.local -- prisma migrate status",
     "prisma:deploy": "dotenv -e .env.local -- prisma migrate deploy",
     "db:seed": "dotenv -e .env.local -- npx tsx prisma/seed.ts",
-    "db:import-skus": "dotenv -e .env.local -- npx tsx scripts/import-sku-master-data.ts"
+    "db:import-skus": "dotenv -e .env.local -- npx tsx scripts/import-sku-master-data.ts",
+    "db:import-boms": "dotenv -e .env.local -- npx tsx scripts/import-production-boms.ts",
+    "db:import-master": "dotenv -e .env.local -- npx tsx scripts/import-sku-master-data.ts && dotenv -e .env.local -- npx tsx scripts/import-production-boms.ts"
   },
   "prisma": {
     "seed": "dotenv -e .env.local -- npx tsx prisma/seed.ts"

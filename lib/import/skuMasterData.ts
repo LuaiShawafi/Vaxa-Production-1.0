@@ -1,26 +1,29 @@
-import { Prisma, PrismaClient } from "@prisma/client";
-import * as fs from "node:fs";
-import * as XLSX from "xlsx";
+import { Prisma, PrismaClient, ProductionFormat } from "@prisma/client";
+import { productionFormatFromGrowingMethod } from "@/lib/domain/inventory/mapProductionFormat";
+import {
+  cellString,
+  isNaToken,
+  loadSheetRows,
+  MASTER_SHEETS,
+  type RawRow,
+} from "@/lib/import/workbook";
 
-type RawRow = Record<string, unknown>;
+/** Rename legacy DB codes to canonical workbook codes (preserve row id). */
+export const SKU_CODE_ALIASES: Record<string, string> = {
+  PL_TARRAGON: "PL_TARRAGON_MEXICAN",
+  PU_TOON_SHOOT: "PU_TOON_SHOOTS",
+  PU_ANISEHYSSOP: "PU_ANISEHYSOP",
+};
 
-function cellString(value: unknown): string | null {
-  if (value === undefined || value === null) {
-    return null;
-  }
-  if (typeof value === "string") {
-    return value.length === 0 ? null : value;
-  }
-  if (typeof value === "number" && !Number.isNaN(value)) {
-    return String(value);
-  }
-  return String(value);
-}
-
-function isNaToken(value: unknown): boolean {
-  const s = cellString(value);
-  return s !== null && s.trim().toUpperCase() === "N/A";
-}
+/** Apply BOM-confirmed master seed identities (PL_CHIVES excluded — master wins). */
+export const SEED_IDENTITY_BY_SKU: Record<string, string> = {
+  PL_SAGE: "Kryddsalvia Fanni EZ SW",
+  PU_CHARD_YELLOW: "Bright Yellow Swiss Chard CN",
+  PU_PAK_CHOI_RED: "Pak Choi Purple Rain F1 CN",
+  PU_RED_BEET: "Leaf Beet Bulls Blood Vancouver CN",
+  PL_ROSEMARY: "Rosmarin Sem",
+  PU_ANISEHYSOP: "Anise Hyssop CN",
+};
 
 function parseOptionalInt(value: unknown): number | null {
   if (value === undefined || value === null || value === "") {
@@ -58,27 +61,32 @@ function parseOptionalDecimal(value: unknown): Prisma.Decimal | null {
   return new Prisma.Decimal(s);
 }
 
+function productionFormatFromRow(row: RawRow, code: string): ProductionFormat {
+  const explicit = cellString(row["Production format"])?.trim().toUpperCase();
+  if (explicit === "PU" || explicit === "PL" || explicit === "TR") {
+    return explicit as ProductionFormat;
+  }
+  const growingMethod = cellString(row.Growing_method);
+  const fromMethod = productionFormatFromGrowingMethod(growingMethod);
+  if (!fromMethod) {
+    throw new Error(
+      `SKU ${code}: unmapped Production format / Growing_method "${growingMethod ?? ""}"`,
+    );
+  }
+  return fromMethod;
+}
+
+function isActiveSkuRow(row: RawRow): boolean {
+  const status = cellString(row["Lifecycle Status"])?.trim().toUpperCase();
+  return status !== "DISCONTINUED";
+}
+
 export function loadSkuMasterRows(filePath: string): RawRow[] {
-  if (!fs.existsSync(filePath)) {
-    throw new Error(`Workbook not found: ${filePath}`);
-  }
-  const wb = XLSX.readFile(filePath, { cellDates: false });
-  const sheetName = wb.SheetNames[0];
-  if (!sheetName) {
-    throw new Error("Workbook has no sheets");
-  }
-  const sheet = wb.Sheets[sheetName];
-  if (!sheet) {
-    throw new Error(`Sheet missing: ${sheetName}`);
-  }
-  const rows = XLSX.utils.sheet_to_json<RawRow>(sheet, { defval: null });
+  const rows = loadSheetRows(filePath, MASTER_SHEETS.skuMaster);
   return rows.filter((r) => cellString(r.SKU));
 }
 
-async function ensureSeedVariety(
-  prisma: PrismaClient,
-  exactName: string,
-) {
+async function ensureSeedVariety(prisma: PrismaClient, exactName: string) {
   const existing = await prisma.seedVariety.findFirst({
     where: { name: exactName },
   });
@@ -96,17 +104,77 @@ async function ensureSeedVariety(
   });
 }
 
-function skuPayload(row: RawRow, primarySeedVarietyId: string) {
+async function applySkuCodeAliases(prisma: PrismaClient) {
+  for (const [legacyCode, canonicalCode] of Object.entries(SKU_CODE_ALIASES)) {
+    const legacy = await prisma.sku.findUnique({ where: { code: legacyCode } });
+    if (!legacy) {
+      continue;
+    }
+    const canonical = await prisma.sku.findUnique({
+      where: { code: canonicalCode },
+    });
+    if (canonical && canonical.id !== legacy.id) {
+      throw new Error(
+        `Cannot alias ${legacyCode} → ${canonicalCode}: both SKU records exist`,
+      );
+    }
+    await prisma.sku.update({
+      where: { id: legacy.id },
+      data: { code: canonicalCode },
+    });
+  }
+}
+
+function resolveSeedTypeForSku(code: string, row: RawRow): string {
+  const override = SEED_IDENTITY_BY_SKU[code];
+  if (override) {
+    return override;
+  }
+  const seedType = cellString(row.Seed_type);
+  if (!seedType) {
+    throw new Error(`SKU ${code}: missing Seed_type`);
+  }
+  return seedType;
+}
+
+function stageInt(
+  value: unknown,
+  field: string,
+  code: string,
+  active: boolean,
+): number {
+  if (!active) {
+    const optional = parseOptionalInt(value);
+    if (optional === null) {
+      console.warn(
+        `  warn ${code}: discontinued SKU missing ${field}; storing 0 (not for planning)`,
+      );
+      return 0;
+    }
+    return optional;
+  }
+  return parseRequiredInt(value, field, code);
+}
+
+function skuPayload(
+  row: RawRow,
+  primarySeedVarietyId: string,
+  active: boolean,
+) {
   const code = cellString(row.SKU)!;
-  const germinationDays = parseRequiredInt(
+  const growingMethod = cellString(row.Growing_method);
+  const productionFormat = productionFormatFromRow(row, code);
+  const germinationDays = stageInt(
     row["DAYS IN GERMINATION"],
     "DAYS IN GERMINATION",
     code,
+    active,
   );
-  const growingDays = parseRequiredInt(
+  const growingDays = stageInt(
     row["DAYS GROWING"],
     "DAYS GROWING",
     code,
+    active,
   );
   const nurseryDays = parseOptionalInt(row["DAYS IN NURSERY"]);
   const dtmTotalDays = parseOptionalInt(row["DTM TOTAL"]);
@@ -122,7 +190,8 @@ function skuPayload(row: RawRow, primarySeedVarietyId: string) {
     code,
     description: cellString(row.DESCRIPTION),
     category: cellString(row.CATEGORY),
-    growingMethod: cellString(row.Growing_method),
+    growingMethod,
+    productionFormat,
     nurseryDensityPerM2: parseOptionalDecimal(row["Nursery Density (per m2)"]),
     finalDensityPerM2: parseOptionalDecimal(row["Final Density (per m2)"]),
     averageUnitWeightGrams: parseOptionalDecimal(
@@ -137,33 +206,51 @@ function skuPayload(row: RawRow, primarySeedVarietyId: string) {
     germinationDays,
     nurseryDays,
     growingDays,
-    active: true,
+    active,
   };
 }
+
+export type SkuImportResult = {
+  rowsRead: number;
+  activeSkus: number;
+  discontinuedSkus: number;
+  skuUpserts: number;
+  seedVarietiesTouched: number;
+  varietiesCreated: number;
+  varietiesUpdated: number;
+  seedLotCount: number;
+  materialLotCount: number;
+};
 
 export async function importSkuMasterData(
   prisma: PrismaClient,
   filePath: string,
   options?: { logEachRow?: boolean },
-) {
+): Promise<SkuImportResult> {
+  await applySkuCodeAliases(prisma);
+
   const rows = loadSkuMasterRows(filePath);
-  if (rows.length !== 41) {
-    console.warn(
-      `Expected 41 SKU rows, found ${rows.length} (proceeding anyway)`,
-    );
+  if (rows.length !== 46) {
+    throw new Error(`Expected 46 SKU rows, found ${rows.length}`);
   }
 
   let skuUpserts = 0;
+  let activeSkus = 0;
+  let discontinuedSkus = 0;
   let varietiesCreated = 0;
   let varietiesUpdated = 0;
   const varietyNames = new Set<string>();
 
   for (const row of rows) {
-    const seedType = cellString(row.Seed_type);
-    if (!seedType) {
-      throw new Error(`SKU ${row.SKU}: missing Seed_type`);
+    const code = cellString(row.SKU)!;
+    const active = isActiveSkuRow(row);
+    if (active) {
+      activeSkus += 1;
+    } else {
+      discontinuedSkus += 1;
     }
 
+    const seedType = resolveSeedTypeForSku(code, row);
     const before = await prisma.seedVariety.findFirst({
       where: { name: seedType },
     });
@@ -175,7 +262,7 @@ export async function importSkuMasterData(
     }
     varietyNames.add(seedType);
 
-    const data = skuPayload(row, variety.id);
+    const data = skuPayload(row, variety.id, active);
     await prisma.sku.upsert({
       where: { code: data.code },
       create: data,
@@ -183,8 +270,14 @@ export async function importSkuMasterData(
     });
     skuUpserts += 1;
     if (options?.logEachRow) {
-      console.log(`  upsert ${data.code}`);
+      console.log(`  upsert ${data.code} (${active ? "ACTIVE" : "DISCONTINUED"})`);
     }
+  }
+
+  if (activeSkus !== 42 || discontinuedSkus !== 4) {
+    throw new Error(
+      `SKU lifecycle counts mismatch: active=${activeSkus}, discontinued=${discontinuedSkus}`,
+    );
   }
 
   const seedLotCount = await prisma.seedLot.count();
@@ -192,6 +285,8 @@ export async function importSkuMasterData(
 
   return {
     rowsRead: rows.length,
+    activeSkus,
+    discontinuedSkus,
     skuUpserts,
     seedVarietiesTouched: varietyNames.size,
     varietiesCreated,

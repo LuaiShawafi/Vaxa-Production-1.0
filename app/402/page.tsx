@@ -1,37 +1,67 @@
-import { Card } from "@/components/ui/Card";
-import { Pill } from "@/components/ui/Pill";
+import Link from "next/link";
+import { notFound } from "next/navigation";
+import {
+  getTeam402,
+  listSeedTodayForTeam,
+} from "@/lib/db/queries/seeding";
+import { Button } from "@/components/ui/Button";
+import { PageHeader } from "@/components/layout/PageHeader";
+import { TodaySummary } from "@/components/402/TodaySummary";
+import { SeedTodayList } from "@/components/402/SeedTodayList";
+import { OPERATIONAL_TIMEZONE } from "@/lib/date";
 
-/**
- * Route shell only. The 402 dashboard sections (Today's Plan, Seed Today,
- * Germination -> Nursery, Nursery, Transplanting, Send for Transplanting,
- * Flat Tray Harvest, Microgreen Box Packing, Other Tasks) are implemented in
- * the next phase. This page intentionally performs no database access.
- */
-export default function Team402Page() {
+function formatMorningContext(instant = new Date()) {
+  const formatted = new Intl.DateTimeFormat("en-GB", {
+    timeZone: OPERATIONAL_TIMEZONE,
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(instant);
+
+  return `${formatted} · Team production workspace`;
+}
+
+export default async function Team402Page() {
+  const team = await getTeam402();
+  if (!team) {
+    notFound();
+  }
+
+  const rows = await listSeedTodayForTeam(team.id);
+
+  const completed = rows.filter((row) => row.status === "COMPLETED").length;
+  const inProgress = rows.filter((row) => row.status === "IN_PROGRESS").length;
+  const remaining = rows.filter(
+    (row) => row.status === "OPEN" || row.status === "IN_PROGRESS",
+  ).length;
+
   return (
-    <main className="px-6 py-7 tablet:px-8">
-      <p className="text-eyebrow font-bold tracking-[0.12em] text-muted uppercase">
-        Team 402
-      </p>
-      <div className="mt-2 flex flex-wrap items-center gap-3">
-        <h1 className="text-h1 font-extrabold tracking-[-0.02em]">
-          402 Production
-        </h1>
-        <Pill tone="blue">Foundation</Pill>
-      </div>
-      <p className="mt-2 text-muted">
-        Application foundation is in place. Production workflows are not
-        implemented yet.
-      </p>
+    <main className="max-w-[1480px]">
+      <PageHeader
+        eyebrow="402 · Cultivation"
+        title="Today"
+        description={formatMorningContext()}
+        density="production"
+        actions={
+          <Link href="/planning" className="inline-flex">
+            <Button variant="primary" density="production" className="font-bold">
+              Open today&apos;s plan
+            </Button>
+          </Link>
+        }
+      />
 
-      <Card className="mt-6 p-5">
-        <h2 className="text-h3 font-bold">Next implementation phase</h2>
-        <p className="mt-2 text-body-small text-muted">
-          The first vertical slice is 402 Seeding: Seed Today, Start, worker
-          selection, Complete, participants, actual quantity, lot allocation,
-          review, commit, and the automatic transition to Germination.
-        </p>
-      </Card>
+      <TodaySummary
+        counts={{
+          total: rows.length,
+          remaining,
+          inProgress,
+          completed,
+        }}
+      />
+
+      <SeedTodayList rows={rows} />
     </main>
   );
 }

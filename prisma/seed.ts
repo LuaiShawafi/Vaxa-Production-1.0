@@ -1,4 +1,10 @@
-import { PrismaClient, SeedLotStatus } from "@prisma/client";
+import {
+  LotInventoryTransactionType,
+  LotKind,
+  Prisma,
+  PrismaClient,
+  SeedLotStatus,
+} from "@prisma/client";
 
 const TEAM_402_NAME = "402";
 
@@ -11,10 +17,10 @@ const LEGACY_DEMO_ONLY_SKU_CODES = ["PU_MUSTARD"] as const;
  * Development fixtures: team, workers, materials, material lots, and (when SKUs
  * exist) traceability lots + PROD BOM for workflow testing.
  *
- * SKU master data is **not** seeded here. Run after migrations:
- *   npm run db:import-skus
+ * SKU + PROD BOM master data is **not** seeded here. Run after migrations:
+ *   npm run db:import-master
  *
- * Then (or re-run) `npm run db:seed` for non-SKU fixtures and PU_RED_RADISH BOM/lots.
+ * Then `npm run db:seed` for team/workers, demo lots, and inventory receipts.
  */
 async function main() {
   const team = await prisma.team.upsert({
@@ -44,52 +50,39 @@ async function main() {
     workers.push(user);
   }
 
-  const materials = [
-    {
-      id: "00000000-0000-4000-8000-000000000801",
-      name: "Substrate mat",
-      category: "substrate",
-      uom: "mats",
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000802",
-      name: "Punnet",
-      category: "packaging",
-      uom: "units",
-    },
-  ];
-  for (const m of materials) {
-    await prisma.material.upsert({
-      where: { id: m.id },
-      update: {
-        name: m.name,
-        category: m.category,
-        unitOfMeasure: m.uom,
-        active: true,
-      },
-      create: {
-        id: m.id,
-        name: m.name,
-        category: m.category,
-        unitOfMeasure: m.uom,
-        active: true,
-      },
-    });
+  const matSubstrate = await prisma.material.findFirst({
+    where: { code: "RM-G-001" },
+  });
+  const matPunnet = await prisma.material.findFirst({
+    where: { code: "RM-G-003" },
+  });
+  if (!matSubstrate || !matPunnet) {
+    console.warn(
+      "RM-G-001 / RM-G-003 materials not found — run npm run db:import-master before db:seed for material lots.",
+    );
   }
 
-  const materialLots = [
-    {
-      id: "00000000-0000-4000-8000-000000000901",
-      materialId: materials[0]!.id,
-      lotNumber: "SUB-2026-018",
-    },
-    {
-      id: "00000000-0000-4000-8000-000000000902",
-      materialId: materials[1]!.id,
-      lotNumber: "PUN-2026-007",
-    },
+  const materialLots = matSubstrate && matPunnet
+    ? [
+        {
+          id: "00000000-0000-4000-8000-000000000901",
+          materialId: matSubstrate.id,
+          lotNumber: "SUB-2026-018",
+          uom: matSubstrate.unitOfMeasure,
+        },
+        {
+          id: "00000000-0000-4000-8000-000000000902",
+          materialId: matPunnet.id,
+          lotNumber: "PUN-2026-007",
+          uom: matPunnet.unitOfMeasure,
+        },
+      ]
+    : [];
+  const materialReceiptIds = [
+    "00000000-0000-4000-8000-000000000a11",
+    "00000000-0000-4000-8000-000000000a12",
   ];
-  for (const lot of materialLots) {
+  for (const [i, lot] of materialLots.entries()) {
     await prisma.materialLot.upsert({
       where: { id: lot.id },
       update: { lotNumber: lot.lotNumber, materialId: lot.materialId },
@@ -98,6 +91,23 @@ async function main() {
         lotNumber: lot.lotNumber,
         materialId: lot.materialId,
         status: "AVAILABLE",
+      },
+    });
+    const uom = lot.uom;
+    await prisma.lotInventoryTransaction.upsert({
+      where: { id: materialReceiptIds[i]! },
+      update: {
+        quantityDelta: new Prisma.Decimal(10_000),
+        unitOfMeasure: uom,
+      },
+      create: {
+        id: materialReceiptIds[i]!,
+        lotKind: LotKind.MATERIAL,
+        materialLotId: lot.id,
+        transactionType: LotInventoryTransactionType.RECEIPT,
+        quantityDelta: new Prisma.Decimal(10_000),
+        unitOfMeasure: uom,
+        createdByUserId: workers[0]!.id,
       },
     });
   }
@@ -109,9 +119,9 @@ async function main() {
     select: { id: true, primarySeedVarietyId: true },
   });
 
-  if (!redRadish) {
+  if (!redRadish?.primarySeedVarietyId) {
     console.warn(
-      "PU_RED_RADISH not found — skipped dev seed lots and BOM. Run: npm run db:import-skus",
+      "PU_RED_RADISH (with primary seed variety) not found — skipped dev seed lots and BOM. Run: npm run db:import-skus",
     );
     console.log(
       `Seeded team ${team.name}, ${workers.length} workers, materials and material lots.`,
@@ -129,7 +139,11 @@ async function main() {
       lotNumber: "RDR-2026-052",
     },
   ];
-  for (const lot of seedLots) {
+  const seedReceiptIds = [
+    "00000000-0000-4000-8000-000000000a01",
+    "00000000-0000-4000-8000-000000000a02",
+  ];
+  for (const [i, lot] of seedLots.entries()) {
     await prisma.seedLot.upsert({
       where: { id: lot.id },
       update: {
@@ -145,44 +159,36 @@ async function main() {
         supplierName: "Nordic Seeds",
       },
     });
+    await prisma.lotInventoryTransaction.upsert({
+      where: { id: seedReceiptIds[i]! },
+      update: {
+        quantityDelta: new Prisma.Decimal(50_000),
+        unitOfMeasure: "g",
+      },
+      create: {
+        id: seedReceiptIds[i]!,
+        lotKind: LotKind.SEED,
+        seedLotId: lot.id,
+        transactionType: LotInventoryTransactionType.RECEIPT,
+        quantityDelta: new Prisma.Decimal(50_000),
+        unitOfMeasure: "g",
+        createdByUserId: workers[0]!.id,
+      },
+    });
   }
 
-  const bomId = "00000000-0000-4000-8000-000000000b01";
-  await prisma.bom.upsert({
-    where: { id: bomId },
-    update: { active: true, ready: true, skuId: redRadish.id, type: "PROD" },
-    create: {
-      id: bomId,
-      skuId: redRadish.id,
-      type: "PROD",
-      active: true,
-      ready: true,
-    },
+  const prodBom = await prisma.bom.findFirst({
+    where: { skuId: redRadish.id, type: "PROD", active: true },
   });
-
-  await prisma.bomLine.deleteMany({ where: { bomId } });
-  await prisma.bomLine.createMany({
-    data: [
-      {
-        bomId,
-        materialId: materials[0]!.id,
-        qtyPerUnit: 2,
-        unitOfMeasure: "mats",
-        sortIndex: 0,
-      },
-      {
-        bomId,
-        materialId: materials[1]!.id,
-        qtyPerUnit: 42,
-        unitOfMeasure: "units",
-        sortIndex: 1,
-      },
-    ],
-  });
+  if (!prodBom) {
+    console.warn(
+      "No active PROD BOM for PU_RED_RADISH — run npm run db:import-boms after SKU import.",
+    );
+  }
 
   console.log(
-    `Seeded team ${team.name}, ${workers.length} workers, materials, material lots, ` +
-      `2 seed lots and PROD BOM for PU_RED_RADISH (SKU master via db:import-skus).`,
+    `Seeded team ${team.name}, ${workers.length} workers, demo seed/material lots ` +
+      `(master SKU/BOM via db:import-master).`,
   );
 }
 

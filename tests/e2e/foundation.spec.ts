@@ -4,7 +4,10 @@ test("402 route shell renders", async ({ page }) => {
   await page.goto("/402");
 
   await expect(
-    page.getByRole("heading", { level: 1, name: "402 Production" }),
+    page.getByRole("heading", { level: 1, name: "Today" }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("heading", { level: 2, name: "Seed Today" }),
   ).toBeVisible();
 });
 

@@ -19,7 +19,7 @@ describe.skipIf(!hasDb)("dev seed (prisma/seed.ts)", () => {
     expect(mustard === null || mustard.active === false).toBe(true);
 
     const activeSkuCount = await prisma.sku.count({ where: { active: true } });
-    expect(activeSkuCount).toBe(41);
+    expect(activeSkuCount).toBe(42);
 
     const red = await prisma.sku.findUnique({
       where: { code: "PU_RED_RADISH" },

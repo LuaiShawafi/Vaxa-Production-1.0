@@ -1,5 +1,5 @@
 /**
- * Idempotent SKU master import from SKU DATA FOR APP.xlsx
+ * Idempotent SKU master import from Vaxa_SKU_Master_and_BOM_Import_v1.xlsx
  *
  * Usage:
  *   npm run db:import-skus
@@ -9,16 +9,12 @@
  */
 import * as path from "node:path";
 import { PrismaClient } from "@prisma/client";
+import { DEFAULT_MASTER_WORKBOOK } from "@/lib/import/workbook";
 import { importSkuMasterData } from "@/lib/import/skuMasterData";
 
 const prisma = new PrismaClient();
 
-const DEFAULT_WORKBOOK = path.join(
-  process.cwd(),
-  "data",
-  "master",
-  "SKU_DATA_FOR_APP.xlsx",
-);
+const DEFAULT_WORKBOOK = path.join(process.cwd(), DEFAULT_MASTER_WORKBOOK);
 
 function workbookPathFromArgs(): string {
   const idx = process.argv.indexOf("--file");
@@ -37,7 +33,7 @@ async function main() {
   });
 
   console.log("\nImport complete:");
-  console.log(`  SKU rows processed: ${result.skuUpserts}`);
+  console.log(`  SKU rows processed: ${result.skuUpserts} (active ${result.activeSkus}, discontinued ${result.discontinuedSkus})`);
   console.log(
     `  Seed varieties (distinct names): ${result.seedVarietiesTouched}`,
   );
