@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import { Drawer } from "@/components/ui/Drawer";
 import { Pill } from "@/components/ui/Pill";
 import { parseDateInput } from "@/lib/date";
+import { PLAN_ITEM_DISCARD_CONFIRM_COPY } from "@/lib/planning/planItemAuthoringUi";
 import type { PlanItemUiState } from "@/lib/planning/planItemUiState";
 
 type Sku = { id: string; code: string };
@@ -24,6 +25,7 @@ export type PlanItemEditSubject = {
   skuId: string;
   skuCode: string;
   plannedDateInput: string;
+  weekdayName: string;
   weekdayLabel: string;
   plannedQuantity: string;
   assignedTeamId: string;
@@ -45,8 +47,11 @@ export function PlanItemEditDrawer({
   subject,
   dirty,
   pending,
+  discardPrompt,
   restoreFocusRef,
   onClose,
+  onConfirmDiscard,
+  onKeepEditing,
   onSuccess,
   onDirtyChange,
   onPendingChange,
@@ -58,8 +63,11 @@ export function PlanItemEditDrawer({
   subject: PlanItemDrawerSubject | null;
   dirty: boolean;
   pending: boolean;
+  discardPrompt: boolean;
   restoreFocusRef: MutableRefObject<HTMLElement | null>;
   onClose: () => void;
+  onConfirmDiscard: () => void;
+  onKeepEditing: () => void;
   onSuccess: () => void;
   onDirtyChange: (dirty: boolean) => void;
   onPendingChange: (pending: boolean) => void;
@@ -109,26 +117,52 @@ export function PlanItemEditDrawer({
       busy={pending}
       restoreFocusRef={restoreFocusRef}
       footer={
-        <div className="flex flex-wrap justify-end gap-2">
-          <Button
-            type="button"
-            variant="secondary"
-            className="min-h-11"
-            disabled={pending}
-            onClick={onClose}
-          >
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            variant="primary"
-            form={formId}
-            className="min-h-11"
-            disabled={pending}
-          >
-            {pending ? "Saving…" : isAdd ? "Add plan item" : "Save plan item"}
-          </Button>
-        </div>
+        discardPrompt ? (
+          <div>
+            <p className="font-semibold" role="alert">
+              {PLAN_ITEM_DISCARD_CONFIRM_COPY}
+            </p>
+            <div className="mt-3 flex flex-wrap justify-end gap-2">
+              <Button
+                type="button"
+                variant="secondary"
+                className="min-h-11"
+                onClick={onConfirmDiscard}
+              >
+                Discard
+              </Button>
+              <Button
+                type="button"
+                variant="primary"
+                className="min-h-11"
+                onClick={onKeepEditing}
+              >
+                Keep editing
+              </Button>
+            </div>
+          </div>
+        ) : (
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button
+              type="button"
+              variant="secondary"
+              className="min-h-11"
+              disabled={pending}
+              onClick={onClose}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="primary"
+              form={formId}
+              className="min-h-11"
+              disabled={pending}
+            >
+              {pending ? "Saving…" : isAdd ? "Add plan item" : "Save plan item"}
+            </Button>
+          </div>
+        )
       }
     >
       {isAdd ? (

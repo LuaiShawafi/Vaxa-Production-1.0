@@ -8,6 +8,7 @@ import {
   type PlanItemEditSubject,
 } from "@/components/planning/PlanItemEditController";
 import { Button } from "@/components/ui/Button";
+import { planItemRowActionName } from "@/lib/planning/planItemAuthoringUi";
 import type { PlanItemUiState } from "@/lib/planning/planItemUiState";
 
 export function PlanItemRowActions({
@@ -30,7 +31,7 @@ export function PlanItemRowActions({
   const canDelete = uiState === "draft" || uiState === "open";
 
   if (!canEdit && !devDeletionEnabled) {
-    return null;
+    return <span className="sr-only">No actions</span>;
   }
 
   return (
@@ -41,13 +42,25 @@ export function PlanItemRowActions({
           variant="secondary"
           className="px-3"
           data-plan-item-edit={planItemId}
+          aria-label={planItemRowActionName(
+            "edit",
+            subject.skuCode,
+            subject.weekdayName,
+          )}
           onClick={(event) => openEdit(subject, event.currentTarget)}
         >
           Edit
         </Button>
       ) : null}
-      {canDelete ? (
-        <DeletePlanItemButton planItemId={planItemId} planId={planId} />
+      {canDelete && subject ? (
+        <DeletePlanItemButton
+          planItemId={planItemId}
+          planId={planId}
+          skuCode={subject.skuCode}
+          weekdayName={subject.weekdayName}
+          uiState={uiState}
+          hasMaterializedBatch={batchId != null}
+        />
       ) : null}
       {devDeletionEnabled && uiState === "locked" ? (
         <DevDeletePlanItemButton planItemId={planItemId} planId={planId} />

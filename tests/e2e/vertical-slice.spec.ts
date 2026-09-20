@@ -58,29 +58,57 @@ test.describe("Planning + 402 seeding vertical slice", () => {
     await page.getByRole("button", { name: "Create plan" }).click();
     await expect(page).toHaveURL(/\/planning\//);
 
-    await page.locator('select[name="skuId"]').selectOption({ label: "PU_RED_RADISH" });
-    await page.locator('input[name="plannedDate"]').fill(dateStr);
-    await page.locator('input[name="plannedQuantity"]').fill("35");
+    const weekdayNames = [
+      "MONDAY",
+      "TUESDAY",
+      "WEDNESDAY",
+      "THURSDAY",
+      "FRIDAY",
+    ] as const;
+    const weekdayName = weekdayNames[isoWd - 1];
+    if (!weekdayName) {
+      test.skip();
+      return;
+    }
+
     await page
+      .getByRole("button", { name: `Add plan item to ${weekdayName}` })
+      .click();
+    const drawer = page.getByRole("dialog");
+    await expect(drawer).toBeVisible();
+    await drawer.locator('select[name="skuId"]').selectOption({
+      label: "PU_RED_RADISH",
+    });
+    await drawer.locator('input[name="plannedQuantity"]').fill("35");
+    await drawer
+      .locator('select[name="assignedTeamId"]')
+      .selectOption({ label: "402" });
+    await drawer
       .locator('select[name="destinationIdentity"]')
       .selectOption(initialDest);
-    await page.getByRole("button", { name: "Add plan item" }).click();
-    await expect(page.getByRole("cell", { name: "PU_RED_RADISH" })).toBeVisible();
+    await drawer.getByRole("button", { name: "Add plan item" }).click();
+    await expect(
+      page.getByRole("cell", { name: "PU_RED_RADISH", exact: true }),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Publish plan" }).click();
     await page.getByRole("button", { name: "Confirm publish" }).click();
     await expect(
-      page.getByText("PUBLISHED", { exact: true }).first(),
+      page.getByText("Published", { exact: true }).first(),
     ).toBeVisible({ timeout: 15_000 });
 
     const batchCell = page.locator("td.font-mono").first();
     const batchNumber = (await batchCell.textContent())?.trim() ?? "";
 
-    await page.getByRole("button", { name: "Edit" }).first().click();
     await page
+      .getByRole("button", { name: `Edit PU_RED_RADISH on ${weekdayName}` })
+      .click();
+    const editDrawer = page.getByRole("dialog");
+    await expect(editDrawer).toBeVisible();
+    await editDrawer
       .locator('select[name="destinationIdentity"]')
       .selectOption(editDest);
-    await page.getByRole("button", { name: "Save plan item" }).click();
+    await editDrawer.getByRole("button", { name: "Save plan item" }).click();
     await expect(page.getByRole("cell", { name: editDest })).toBeVisible({
       timeout: 10_000,
     });

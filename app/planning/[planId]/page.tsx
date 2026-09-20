@@ -163,6 +163,7 @@ export default async function PlanningDetailPage({ params }: PageProps) {
                                             plannedDateInput: formatDateInput(
                                               item.plannedDate,
                                             ),
+                                            weekdayName: section.weekdayName,
                                             weekdayLabel: `${section.weekdayName} ${section.dayLabel}`,
                                             plannedQuantity:
                                               item.plannedQuantity.toString(),

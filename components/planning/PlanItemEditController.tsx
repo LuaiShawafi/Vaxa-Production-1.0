@@ -15,6 +15,7 @@ import {
   type PlanItemDrawerSubject,
   type PlanItemEditSubject,
 } from "@/components/planning/PlanItemEditDrawer";
+import { planItemDrawerCloseIntent } from "@/lib/planning/planItemAuthoringUi";
 
 type Sku = { id: string; code: string };
 type Team = { id: string; name: string };
@@ -49,19 +50,44 @@ export function PlanItemEditController({
   const [subject, setSubject] = useState<PlanItemDrawerSubject | null>(null);
   const [dirty, setDirty] = useState(false);
   const [pending, setPending] = useState(false);
+  const [discardPrompt, setDiscardPrompt] = useState(false);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
   const scrollYRef = useRef(0);
   const returnItemIdRef = useRef<string | null>(null);
   const returnAddDateRef = useRef<string | null>(null);
 
-  const close = useCallback(() => {
-    if (pending) {
-      return;
-    }
+  const dismiss = useCallback(() => {
     setOpen(false);
     setSubject(null);
     setDirty(false);
-  }, [pending]);
+    setDiscardPrompt(false);
+  }, []);
+
+  const requestClose = useCallback(() => {
+    const intent = planItemDrawerCloseIntent({
+      pending,
+      dirty,
+      discardPromptOpen: discardPrompt,
+    });
+    if (intent === "prompt-discard") {
+      setDiscardPrompt(true);
+      return;
+    }
+    if (intent === "close") {
+      dismiss();
+    }
+  }, [pending, dirty, discardPrompt, dismiss]);
+
+  const confirmDiscard = useCallback(() => {
+    if (pending) {
+      return;
+    }
+    dismiss();
+  }, [pending, dismiss]);
+
+  const keepEditing = useCallback(() => {
+    setDiscardPrompt(false);
+  }, []);
 
   const captureOpen = useCallback(
     (next: PlanItemDrawerSubject, trigger: HTMLElement | null) => {
@@ -77,6 +103,7 @@ export function PlanItemEditController({
       setSubject(next);
       setDirty(false);
       setPending(false);
+      setDiscardPrompt(false);
       setOpen(true);
     },
     [],
@@ -102,6 +129,7 @@ export function PlanItemEditController({
     const addDate = returnAddDateRef.current;
     setDirty(false);
     setPending(false);
+    setDiscardPrompt(false);
     setOpen(false);
     setSubject(null);
     const restore = () => {
@@ -136,11 +164,19 @@ export function PlanItemEditController({
         subject={subject}
         dirty={dirty}
         pending={pending}
+        discardPrompt={discardPrompt}
         restoreFocusRef={restoreFocusRef}
-        onClose={close}
+        onClose={requestClose}
+        onConfirmDiscard={confirmDiscard}
+        onKeepEditing={keepEditing}
         onSuccess={onSuccess}
         onDirtyChange={setDirty}
-        onPendingChange={setPending}
+        onPendingChange={(next) => {
+          setPending(next);
+          if (next) {
+            setDiscardPrompt(false);
+          }
+        }}
       />
     </PlanItemEditContext.Provider>
   );
