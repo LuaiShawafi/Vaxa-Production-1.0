@@ -29,11 +29,17 @@ export default async function CompleteSeedingPage({ params }: PageProps) {
   }
 
   if (detail.task.status === "COMPLETED") {
+    const completedDestination =
+      detail.task.batch.officialIdentityLockedAt != null
+        ? detail.task.batch.currentDestination
+        : detail.task.planItem.destinationIdentity;
     return (
-      <main className="max-w-3xl">
+      <main className="max-w-5xl">
         <SeedingCompleteSuccess
           visibleBatchNumber={detail.task.batch.visibleBatchNumber}
           skuCode={detail.task.planItem.sku.code}
+          trayQuantity={Number(detail.task.planItem.plannedQuantity)}
+          destination={completedDestination}
         />
       </main>
     );
@@ -119,13 +125,17 @@ export default async function CompleteSeedingPage({ params }: PageProps) {
   });
 
   const plannedQty = Number(detail.task.planItem.plannedQuantity);
+  const destination =
+    detail.task.batch.officialIdentityLockedAt != null
+      ? detail.task.batch.currentDestination
+      : detail.task.planItem.destinationIdentity;
 
   return (
-    <main className="max-w-3xl">
+    <main className="max-w-5xl">
       <PageHeader
-        eyebrow="402 · Seeding"
-        title="Complete seeding"
-        description={`${detail.task.planItem.sku.code} · ${detail.task.batch.visibleBatchNumber}`}
+        eyebrow="402 · Cultivation"
+        title="Complete Seeding"
+        description={`Batch ${detail.task.batch.visibleBatchNumber} · ${detail.task.planItem.sku.code} · ${plannedQty} trays planned`}
         density="production"
         backLink={{
           href: `/402/seeding/${taskId}`,
@@ -137,9 +147,11 @@ export default async function CompleteSeedingPage({ params }: PageProps) {
         taskId={taskId}
         teamId={team.id}
         starterUserId={detail.task.starterUserId}
+        starterName={detail.task.starterUser?.name ?? null}
         plannedQuantity={plannedQty}
         visibleBatchNumber={detail.task.batch.visibleBatchNumber}
         skuCode={detail.task.planItem.sku.code}
+        destination={destination}
         members={detail.teamMembers}
         preselectedLots={preselected.data}
         bomSnapshot={bomParsed.data}

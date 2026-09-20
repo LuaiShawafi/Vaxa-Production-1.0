@@ -7,21 +7,35 @@ import { SeedTodayInfoDrawer } from "@/components/402/SeedTodayInfoDrawer";
 import { loadSeedTodayTaskInfoAction } from "@/lib/actions/seeding";
 import type { SeedTodayTaskInfo } from "@/lib/types/seedTodayTaskInfo";
 
+export type SeedTodayPrimaryAction = {
+  label: string;
+  href: string;
+};
+
 type SeedTodayRowActionsProps = {
   taskId: string;
-  canStart: boolean;
-  primaryLabel: string;
+  primaryAction: SeedTodayPrimaryAction | null;
   onOpenInfo: (taskId: string) => void;
 };
 
 export function SeedTodayRowActions({
   taskId,
-  canStart,
-  primaryLabel,
+  primaryAction,
   onOpenInfo,
 }: SeedTodayRowActionsProps) {
   return (
     <div className="flex flex-row items-center justify-end gap-1.5">
+      {primaryAction ? (
+        <Link href={primaryAction.href} className="inline-flex">
+          <Button
+            variant="primary"
+            density="production"
+            className="min-h-12 min-w-[5.5rem] px-4 text-body-small font-bold"
+          >
+            {primaryAction.label}
+          </Button>
+        </Link>
+      ) : null}
       <Button
         type="button"
         variant="secondary"
@@ -31,17 +45,6 @@ export function SeedTodayRowActions({
       >
         Info
       </Button>
-      {canStart ? (
-        <Link href={`/402/seeding/${taskId}`} className="inline-flex">
-          <Button
-            variant="primary"
-            density="production"
-            className="min-h-12 min-w-[5.5rem] px-4 text-body-small font-bold"
-          >
-            {primaryLabel}
-          </Button>
-        </Link>
-      ) : null}
     </div>
   );
 }

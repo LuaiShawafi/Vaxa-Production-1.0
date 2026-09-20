@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getSeedingTaskDetail, getTeam402 } from "@/lib/db/queries/seeding";
 import { Card } from "@/components/ui/Card";
-import { StartSeedingPanel } from "@/components/seeding/StartSeedingPanel";
+import { StartSeedingWorkspace } from "@/components/seeding/StartSeedingWorkspace";
 import { SeedingTaskSummary } from "@/components/seeding/SeedingTaskSummary";
 import { bomSnapshotSchema } from "@/lib/validation/seeding";
 import { PageHeader } from "@/components/layout/PageHeader";
@@ -68,11 +68,16 @@ export default async function SeedingTaskPage({ params }: PageProps) {
       />
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
-        {canStart ? (
-          <StartSeedingPanel
+        {canStart || inProgress ? (
+          <StartSeedingWorkspace
+            showPanel={canStart}
             taskId={taskId}
             teamId={team.id}
             members={teamMembers}
+            visibleBatchNumber={task.batch.visibleBatchNumber}
+            skuCode={task.planItem.sku.code}
+            plannedQuantity={Number(task.planItem.plannedQuantity)}
+            destination={destination}
           />
         ) : null}
 

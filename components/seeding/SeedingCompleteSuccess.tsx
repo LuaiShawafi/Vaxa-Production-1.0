@@ -2,16 +2,20 @@
 
 import { useCallback } from "react";
 import { useRouter } from "next/navigation";
-import { SuccessOverlay } from "@/components/ui/SuccessOverlay";
+import { SeedingSuccessConfirmation } from "@/components/seeding/SeedingSuccessConfirmation";
 
 type SeedingCompleteSuccessProps = {
   visibleBatchNumber: string;
   skuCode: string;
+  trayQuantity: number;
+  destination?: string;
 };
 
 export function SeedingCompleteSuccess({
   visibleBatchNumber,
   skuCode,
+  trayQuantity,
+  destination,
 }: SeedingCompleteSuccessProps) {
   const router = useRouter();
   const returnToToday = useCallback(() => {
@@ -20,10 +24,13 @@ export function SeedingCompleteSuccess({
   }, [router]);
 
   return (
-    <SuccessOverlay
+    <SeedingSuccessConfirmation
       show
-      title="Seeding completed"
-      message={`${skuCode} · ${visibleBatchNumber} recorded. Batch moved to Germination. Returning to Today…`}
+      variant="completed"
+      visibleBatchNumber={visibleBatchNumber}
+      skuCode={skuCode}
+      trayQuantity={trayQuantity}
+      destination={destination}
       onDone={returnToToday}
     />
   );

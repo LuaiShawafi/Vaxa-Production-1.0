@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { startSeedingAction } from "@/lib/actions/seeding";
 import { Button } from "@/components/ui/Button";
 import { Card } from "@/components/ui/Card";
@@ -14,14 +13,15 @@ export function StartSeedingPanel({
   taskId,
   teamId,
   members,
+  onStartSuccess,
   disabled,
 }: {
   taskId: string;
   teamId: string;
   members: Member[];
+  onStartSuccess: () => void;
   disabled?: boolean;
 }) {
-  const router = useRouter();
   const [workerId, setWorkerId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [conflict, setConflict] = useState<{
@@ -133,7 +133,7 @@ export function StartSeedingPanel({
                 setError(result.message);
                 return;
               }
-              router.refresh();
+              onStartSuccess();
             });
           }}
         >

@@ -97,7 +97,8 @@ test.describe("Planning + 402 seeding vertical slice", () => {
 
     await page.getByRole("button", { name: "Alex Kim" }).click();
     await page.getByRole("button", { name: "Start Seeding" }).click();
-    await page.getByRole("link", { name: "Complete" }).click();
+    await expect(page).toHaveURL(/\/402\/?$/, { timeout: 10_000 });
+    await row.getByRole("link", { name: "Complete" }).click();
 
     await page.getByRole("button", { name: "Elena Svensson" }).click();
 

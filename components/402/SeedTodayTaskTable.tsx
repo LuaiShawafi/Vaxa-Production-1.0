@@ -5,6 +5,7 @@ import { Pill } from "@/components/ui/Pill";
 import {
   SeedTodayInfoController,
   SeedTodayRowActions,
+  type SeedTodayPrimaryAction,
 } from "@/components/402/SeedTodayRowActions";
 import type { SeedTodayRow } from "@/components/402/SeedTodayList";
 
@@ -23,6 +24,22 @@ function statusPill(status: string) {
     return <Pill tone="amber">In progress</Pill>;
   }
   return <Pill tone="blue">Open</Pill>;
+}
+
+function primaryActionForRow(
+  status: string,
+  taskId: string,
+): SeedTodayPrimaryAction | null {
+  if (status === "OPEN") {
+    return { label: "Start", href: `/402/seeding/${taskId}` };
+  }
+  if (status === "IN_PROGRESS") {
+    return {
+      label: "Complete",
+      href: `/402/seeding/${taskId}/complete`,
+    };
+  }
+  return null;
 }
 
 export function SeedTodayTaskTable({ rows }: { rows: SeedTodayRow[] }) {
@@ -71,13 +88,11 @@ function SeedTodayRowItem({
   onOpenInfo: (taskId: string) => void;
 }) {
   const qtyLabel = `${row.plannedQuantity} ${row.quantityUom}`;
-  const canStart = row.status !== "COMPLETED";
-  const primaryLabel = row.status === "IN_PROGRESS" ? "Resume" : "Start";
+  const primaryAction = primaryActionForRow(row.status, row.taskId);
 
   const actionProps = {
     taskId: row.taskId,
-    canStart,
-    primaryLabel,
+    primaryAction,
     onOpenInfo,
   };
 
