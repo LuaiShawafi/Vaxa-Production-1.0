@@ -63,6 +63,8 @@
 
   --breakpoint-tablet: 1050px;
   --breakpoint-mobile: 700px;
+  /* Planning week detail: seven-column table vs stacked cards */
+  --breakpoint-plan-week: 48rem;
 }
 
 /* Layout tokens that are not Tailwind utility namespaces. */

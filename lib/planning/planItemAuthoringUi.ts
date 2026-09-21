@@ -19,6 +19,20 @@ export function planItemDrawerCloseIntent(args: {
 
 export const PLAN_ITEM_DISCARD_CONFIRM_COPY = "Discard changes?";
 
+/** Shown on draft plan items (add + edit before publish). */
+export const PLAN_ITEM_DESTINATION_HINT_DRAFT =
+  "The selected destination is used when the batch number is created at publish.";
+
+/** Shown when editing a published OPEN item (batch already materialised). */
+export const PLAN_ITEM_DESTINATION_HINT_PUBLISHED_OPEN =
+  "Batch number is fixed at publish; changing destination updates the plan only.";
+
+export function planItemDestinationFieldHint(lockSku: boolean): string {
+  return lockSku
+    ? PLAN_ITEM_DESTINATION_HINT_PUBLISHED_OPEN
+    : PLAN_ITEM_DESTINATION_HINT_DRAFT;
+}
+
 export function planItemDeleteConfirmMessage(args: {
   uiState: PlanItemUiState;
   hasMaterializedBatch: boolean;

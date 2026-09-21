@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import {
+  PLAN_ITEM_DESTINATION_HINT_DRAFT,
+  PLAN_ITEM_DESTINATION_HINT_PUBLISHED_OPEN,
   PLAN_ITEM_DISCARD_CONFIRM_COPY,
   planItemDeleteConfirmMessage,
+  planItemDestinationFieldHint,
   planItemDrawerCloseIntent,
   planItemRowActionName,
 } from "@/lib/planning/planItemAuthoringUi";
@@ -83,6 +86,21 @@ describe("plan item delete confirm copy", () => {
         uiState: "draft",
         hasMaterializedBatch: false,
       }),
+    );
+  });
+});
+
+describe("plan item destination field hints", () => {
+  it("uses draft copy before publish and published-open copy after", () => {
+    expect(planItemDestinationFieldHint(false)).toBe(
+      PLAN_ITEM_DESTINATION_HINT_DRAFT,
+    );
+    expect(planItemDestinationFieldHint(true)).toBe(
+      PLAN_ITEM_DESTINATION_HINT_PUBLISHED_OPEN,
+    );
+    expect(PLAN_ITEM_DESTINATION_HINT_DRAFT).toMatch(/created at publish/);
+    expect(PLAN_ITEM_DESTINATION_HINT_PUBLISHED_OPEN).toMatch(
+      /fixed at publish/,
     );
   });
 });

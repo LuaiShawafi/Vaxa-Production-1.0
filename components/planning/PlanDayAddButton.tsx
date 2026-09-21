@@ -18,6 +18,7 @@ export function PlanDayAddButton({
     <Button
       type="button"
       variant="secondary"
+      className="min-h-10 border-line/90 bg-surface-2/50 px-3.5 text-body-small font-semibold text-muted shadow-none"
       data-plan-item-add={dateInput}
       aria-label={`Add plan item to ${weekdayName}`}
       onClick={(event) =>

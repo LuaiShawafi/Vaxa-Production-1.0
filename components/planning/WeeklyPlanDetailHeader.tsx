@@ -55,7 +55,7 @@ export function WeeklyPlanDetailHeader({
   ) : null;
 
   return (
-    <div className="mb-6 space-y-4">
+    <div className="mb-7 space-y-4">
       <PageHeader
         eyebrow="Planning"
         title={`Week ${week}`}

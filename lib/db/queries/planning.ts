@@ -31,7 +31,14 @@ export async function getWeeklyPlanDetail(planId: string) {
       planItems: {
         orderBy: { plannedDate: "asc" },
         include: {
-          sku: { select: { id: true, code: true, description: true } },
+          sku: {
+            select: {
+              id: true,
+              code: true,
+              description: true,
+              productionFormat: true,
+            },
+          },
           assignedTeam: { select: { id: true, name: true } },
           batch: { select: { id: true, visibleBatchNumber: true } },
           productionTasks: { select: { id: true, status: true } },

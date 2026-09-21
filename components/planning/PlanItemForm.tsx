@@ -10,6 +10,8 @@ import {
 } from "@/lib/actions/planning";
 import { ALLOWED_DESTINATIONS } from "@/lib/constants";
 import { formatDateInput, operationalTodayString } from "@/lib/date";
+import { planItemDestinationFieldHint } from "@/lib/planning/planItemAuthoringUi";
+import { readPlanItemFormPayload } from "@/lib/planning/planItemFormPayload";
 
 type Sku = { id: string; code: string };
 type Team = { id: string; name: string };
@@ -83,13 +85,17 @@ export function PlanItemForm({
           SKU cannot change after publish.
         </span>
       ) : null}
+      {lockSku && initial?.skuId ? (
+        <input type="hidden" name="skuId" value={initial.skuId} />
+      ) : null}
       <select
         id={`${idPrefix}-sku`}
-        name="skuId"
-        required
+        name={lockSku ? undefined : "skuId"}
+        required={!lockSku}
         disabled={lockSku || pending}
         defaultValue={initial?.skuId}
         className={controlClassName}
+        aria-disabled={lockSku || undefined}
       >
         {skus.map((sku) => (
           <option key={sku.id} value={sku.id}>
@@ -177,8 +183,7 @@ export function PlanItemForm({
         ))}
       </select>
       <span className="mt-1 block text-caption text-muted">
-        Batch number is fixed at publish; changing destination updates the plan
-        only.
+        {planItemDestinationFieldHint(lockSku)}
       </span>
     </label>
   );
@@ -219,15 +224,7 @@ export function PlanItemForm({
         onPendingChange?.(true);
         setError(null);
         const formEl = e.currentTarget;
-        const form = new FormData(formEl);
-        const payload = {
-          planId,
-          skuId: String(form.get("skuId")),
-          plannedDate: String(form.get("plannedDate")),
-          plannedQuantity: Number(form.get("plannedQuantity")),
-          assignedTeamId: String(form.get("assignedTeamId")),
-          destinationIdentity: String(form.get("destinationIdentity")),
-        };
+        const payload = readPlanItemFormPayload(new FormData(formEl), planId);
 
         startTransition(async () => {
           const result = initial

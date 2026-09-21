@@ -17,17 +17,22 @@ const toneClasses: Record<PillTone, string> = {
 export function Pill({
   tone,
   children,
+  className,
 }: {
   tone: PillTone;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <span
       className={[
         "inline-flex items-center gap-[5px] rounded-pill px-2 py-[6px]",
-        "text-caption font-bold",
+        "text-caption font-bold leading-snug",
         toneClasses[tone],
-      ].join(" ")}
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       {children}
     </span>

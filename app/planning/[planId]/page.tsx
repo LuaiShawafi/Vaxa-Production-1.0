@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { PlanDayAddButton } from "@/components/planning/PlanDayAddButton";
 import { PlanItemEditController } from "@/components/planning/PlanItemEditController";
+import { PlanItemMobileCard } from "@/components/planning/PlanItemMobileCard";
 import { PlanItemRowActions } from "@/components/planning/PlanItemRowActions";
 import { WeeklyPlanDetailHeader } from "@/components/planning/WeeklyPlanDetailHeader";
 import {
@@ -10,12 +11,19 @@ import {
 } from "@/lib/db/queries/planning";
 import { Pill } from "@/components/ui/Pill";
 import { formatDateInput, isoWeekPlanningDaySections } from "@/lib/date";
-import { planItemUiState } from "@/lib/planning/planItemUiState";
-import { ProductionTaskStatus, WeeklyPlanStatus } from "@prisma/client";
+import {
+  buildPlanItemWeekDetailPresentation,
+  formatPlanItemProductionUnits,
+} from "@/lib/planning/planItemWeekDetailPresentation";
+import { WeeklyPlanStatus } from "@prisma/client";
 
-/** Sticky on small viewports so Edit/Delete stay visible while the table scrolls. */
-const planItemActionsCellClass =
-  "bg-surface p-3 max-lg:sticky max-lg:right-0 max-lg:z-[1] max-lg:w-[1%] max-lg:min-w-[11.5rem] max-lg:whitespace-nowrap max-lg:border-l max-lg:border-line max-lg:shadow-[-10px_0_12px_-6px_rgba(24,32,27,0.14)]";
+/** Comfortable row-action targets without changing PlanItemRowActions. */
+const planItemRowActionsSurfaceClass =
+  "[&_button]:min-h-11 [&_button]:px-3.5 [&_button]:text-body-small";
+
+const planWeekTableHeadCellClass =
+  "px-3.5 py-3 text-left text-eyebrow font-bold uppercase tracking-[0.08em] text-muted";
+const planWeekTableCellClass = "px-3.5 py-3.5 align-middle text-body-small";
 
 type PageProps = { params: Promise<{ planId: string }> };
 
@@ -56,7 +64,7 @@ export default async function PlanningDetailPage({ params }: PageProps) {
       />
 
       <PlanItemEditController planId={plan.id} skus={skus} teams={teams}>
-        <div className="space-y-2">
+        <div className="space-y-8">
             {weekdaySections.map((section) => {
               const dayItems = itemsByDate.get(section.dateInput) ?? [];
               const isEmpty = dayItems.length === 0;
@@ -64,10 +72,14 @@ export default async function PlanningDetailPage({ params }: PageProps) {
               return (
                 <section
                   key={section.dateInput}
-                  className={isEmpty ? undefined : "pb-4"}
+                  className={
+                    isEmpty
+                      ? "pb-1"
+                      : "border-b border-line pb-8 last:border-b-0 last:pb-2"
+                  }
                 >
-                  <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-                    <h2 className="text-h3 font-bold">
+                  <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                    <h2 className="text-h3 font-bold tracking-tight">
                       {section.weekdayName} — {section.dayLabel}
                     </h2>
                     {isDraft ? (
@@ -81,115 +93,145 @@ export default async function PlanningDetailPage({ params }: PageProps) {
 
                   {isEmpty ? (
                     isDraft ? null : (
-                      <p className="mt-1 text-muted text-body-small">
+                      <p className="mt-2 text-muted text-body-small">
                         No items planned.
                       </p>
                     )
                   ) : (
-                    <div className="mt-3 overflow-x-auto rounded-card border border-line bg-surface">
-                      <table className="w-full text-table">
-                        <thead>
-                          <tr className="border-b border-line text-left text-caption uppercase text-muted">
-                            <th className="p-3">State</th>
-                            <th className="p-3">SKU</th>
-                            <th className="p-3">Qty</th>
-                            <th className="p-3">Team</th>
-                            <th className="p-3">Destination</th>
-                            <th className="p-3">Batch #</th>
-                            <th className={planItemActionsCellClass}>Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {dayItems.map((item) => {
-                            const taskStatus = item.productionTasks[0]
-                              ?.status as ProductionTaskStatus | undefined;
-                            const uiState = planItemUiState(
-                              plan.status,
-                              taskStatus,
-                            );
-                            const stateLabel =
-                              uiState === "draft"
-                                ? "Draft"
-                                : uiState === "open"
-                                  ? "Open"
-                                  : "Started / locked";
+                    <>
+                      <div className="mt-4 hidden overflow-x-auto rounded-card border border-line bg-surface plan-week:block">
+                        <table className="w-full text-body-small">
+                          <thead>
+                            <tr className="border-b border-line bg-surface-2/35 text-left">
+                              <th className={planWeekTableHeadCellClass}>State</th>
+                              <th className={planWeekTableHeadCellClass}>SKU</th>
+                              <th className={planWeekTableHeadCellClass}>Qty</th>
+                              <th className={planWeekTableHeadCellClass}>Units</th>
+                              <th className={planWeekTableHeadCellClass}>
+                                Destination
+                              </th>
+                              <th className={planWeekTableHeadCellClass}>
+                                Batch #
+                              </th>
+                              <th className={planWeekTableHeadCellClass}>
+                                Actions
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {dayItems.map((item) => {
+                              const { uiState, stateLabel, subject } =
+                                buildPlanItemWeekDetailPresentation({
+                                  item,
+                                  planStatus: plan.status,
+                                  weekdayName: section.weekdayName,
+                                  dayLabel: section.dayLabel,
+                                });
 
-                            return (
-                              <tr
-                                key={item.id}
-                                className="border-b border-line align-middle last:border-0"
-                              >
-                                <td className="p-3">
-                                  <Pill
-                                    tone={
-                                      uiState === "locked"
-                                        ? "amber"
-                                        : uiState === "open"
-                                          ? "green"
-                                          : "blue"
-                                    }
+                              return (
+                                <tr
+                                  key={item.id}
+                                  className="border-b border-line align-middle last:border-0"
+                                >
+                                  <td className={planWeekTableCellClass}>
+                                    <Pill
+                                      tone={
+                                        uiState === "locked"
+                                          ? "amber"
+                                          : uiState === "open"
+                                            ? "green"
+                                            : "blue"
+                                      }
+                                      className="px-2.5 py-1.5 text-eyebrow"
+                                    >
+                                      {stateLabel}
+                                    </Pill>
+                                  </td>
+                                  <td
+                                    className={`${planWeekTableCellClass} font-semibold`}
                                   >
-                                    {stateLabel}
-                                  </Pill>
-                                </td>
-                                <td className="p-3 font-semibold">
-                                  {item.sku.code}
-                                </td>
-                                <td className="p-3">
-                                  {item.plannedQuantity.toString()}{" "}
-                                  {item.quantityUom}
-                                </td>
-                                <td className="p-3">{item.assignedTeam.name}</td>
-                                <td className="p-3">
-                                  {item.destinationIdentity}
-                                </td>
-                                <td className="p-3 font-mono text-body-small">
-                                  {item.batch?.visibleBatchNumber ?? "—"}
-                                </td>
-                                <td className={planItemActionsCellClass}>
-                                  <PlanItemRowActions
-                                    planId={plan.id}
-                                    uiState={uiState}
-                                    devDeletionEnabled={devDeletionEnabled}
-                                    batchId={item.batch?.id ?? null}
-                                    planItemId={item.id}
-                                    subject={
-                                      uiState === "draft" || uiState === "open"
-                                        ? {
-                                            kind: "edit",
-                                            planItemId: item.id,
-                                            skuId: item.sku.id,
-                                            skuCode: item.sku.code,
-                                            plannedDateInput: formatDateInput(
-                                              item.plannedDate,
-                                            ),
-                                            weekdayName: section.weekdayName,
-                                            weekdayLabel: `${section.weekdayName} ${section.dayLabel}`,
-                                            plannedQuantity:
-                                              item.plannedQuantity.toString(),
-                                            assignedTeamId:
-                                              item.assignedTeam.id,
-                                            assignedTeamName:
-                                              item.assignedTeam.name,
-                                            destinationIdentity:
-                                              item.destinationIdentity,
-                                            lockSku: uiState === "open",
-                                            uiState,
-                                            stateLabel,
-                                            visibleBatchNumber:
-                                              item.batch?.visibleBatchNumber ??
-                                              null,
-                                          }
-                                        : null
-                                    }
-                                  />
-                                </td>
-                              </tr>
-                            );
-                          })}
-                        </tbody>
-                      </table>
-                    </div>
+                                    {item.sku.code}
+                                  </td>
+                                  <td
+                                    className={`${planWeekTableCellClass} tabular-nums`}
+                                  >
+                                    {item.plannedQuantity.toString()}{" "}
+                                    {item.quantityUom}
+                                  </td>
+                                  <td
+                                    className={`${planWeekTableCellClass} tabular-nums font-medium`}
+                                  >
+                                    {formatPlanItemProductionUnits(
+                                      item.plannedQuantity,
+                                      item.sku.productionFormat,
+                                    )}
+                                  </td>
+                                  <td
+                                    className={`${planWeekTableCellClass} tabular-nums`}
+                                  >
+                                    {item.destinationIdentity}
+                                  </td>
+                                  <td
+                                    className={`${planWeekTableCellClass} font-mono`}
+                                  >
+                                    {item.batch?.visibleBatchNumber ?? "—"}
+                                  </td>
+                                  <td
+                                    className={`${planWeekTableCellClass} ${planItemRowActionsSurfaceClass}`}
+                                  >
+                                    <PlanItemRowActions
+                                      planId={plan.id}
+                                      uiState={uiState}
+                                      devDeletionEnabled={devDeletionEnabled}
+                                      batchId={item.batch?.id ?? null}
+                                      planItemId={item.id}
+                                      subject={subject}
+                                    />
+                                  </td>
+                                </tr>
+                              );
+                            })}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      <div className="mt-4 flex flex-col gap-2.5 plan-week:hidden">
+                        {dayItems.map((item) => {
+                          const { uiState, stateLabel, subject } =
+                            buildPlanItemWeekDetailPresentation({
+                              item,
+                              planStatus: plan.status,
+                              weekdayName: section.weekdayName,
+                              dayLabel: section.dayLabel,
+                            });
+
+                          return (
+                            <PlanItemMobileCard
+                              key={item.id}
+                              planId={plan.id}
+                              devDeletionEnabled={devDeletionEnabled}
+                              planItemId={item.id}
+                              batchId={item.batch?.id ?? null}
+                              uiState={uiState}
+                              stateLabel={stateLabel}
+                              skuCode={item.sku.code}
+                              productionUnitsDisplay={formatPlanItemProductionUnits(
+                                item.plannedQuantity,
+                                item.sku.productionFormat,
+                              )}
+                              plannedQuantity={item.plannedQuantity.toString()}
+                              quantityUom={item.quantityUom}
+                              teamName={item.assignedTeam.name}
+                              destinationIdentity={item.destinationIdentity}
+                              visibleBatchNumber={
+                                item.batch?.visibleBatchNumber ?? null
+                              }
+                              subject={subject}
+                            />
+                          );
+                        })}
+                      </div>
+                    </>
                   )}
                 </section>
               );
