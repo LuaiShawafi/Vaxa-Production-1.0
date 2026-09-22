@@ -210,3 +210,24 @@ export function expectedDateFromOperationalBase(
   const base = parseDateInput(baseYmd);
   return addCalendarDays(base, calendarDaysToAdd);
 }
+
+/**
+ * Operational calendar days elapsed between two instants (Stockholm calendar dates).
+ * Same convention as expectedGerminationAt: difference in YYYY-MM-DD calendar days.
+ */
+export function operationalCalendarDaysBetween(
+  fromInstant: Date,
+  toInstant: Date,
+): number {
+  const from = parseDateInput(operationalDateStringFromInstant(fromInstant));
+  const to = parseDateInput(operationalDateStringFromInstant(toInstant));
+  return Math.round((to.getTime() - from.getTime()) / 86_400_000);
+}
+
+/** Expected completion date from a stage transition instant + configured stage days. */
+export function expectedCompletionFromStageTransition(
+  transitionInstant: Date,
+  stageDays: number,
+): Date {
+  return expectedDateFromOperationalBase(transitionInstant, stageDays);
+}

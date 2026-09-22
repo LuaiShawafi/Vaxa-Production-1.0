@@ -2,6 +2,8 @@ import { Prisma } from "@prisma/client";
 
 const SEEDING_TASK_UNIQUE = "production_events_seeding_completed_task_key";
 const SEEDING_BATCH_UNIQUE = "production_events_seeding_completed_batch_key";
+const MOVED_TO_NURSERY_BATCH_UNIQUE =
+  "production_events_moved_to_nursery_batch_key";
 
 export function isPrismaUniqueViolation(
   error: unknown,
@@ -48,4 +50,11 @@ export function isBatchSkuNumberCollision(
 ): boolean {
   const targets = uniqueViolationTargets(error);
   return targets.some((t) => t.includes("sku_id") && t.includes("visible"));
+}
+
+export function isMovedToNurseryBatchUniqueViolation(
+  error: Prisma.PrismaClientKnownRequestError,
+): boolean {
+  const targets = uniqueViolationTargets(error);
+  return targets.some((t) => t.includes(MOVED_TO_NURSERY_BATCH_UNIQUE));
 }

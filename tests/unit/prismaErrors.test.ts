@@ -2,6 +2,7 @@ import { Prisma } from "@prisma/client";
 import { describe, expect, it } from "vitest";
 import {
   isBatchSkuNumberCollision,
+  isMovedToNurseryBatchUniqueViolation,
   isPrismaUniqueViolation,
   isSeedingBatchUniqueViolation,
   isSeedingTaskUniqueViolation,
@@ -45,6 +46,11 @@ describe("prismaErrors", () => {
     expect(
       isBatchSkuNumberCollision(
         p2002("batches_sku_id_visible_batch_number_key"),
+      ),
+    ).toBe(true);
+    expect(
+      isMovedToNurseryBatchUniqueViolation(
+        p2002("production_events_moved_to_nursery_batch_key"),
       ),
     ).toBe(true);
   });

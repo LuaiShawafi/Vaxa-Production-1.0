@@ -30,7 +30,7 @@ datasource db {
 /// Physical cultivation/location state of a batch.
 /// The complete V1 cultivation lifecycle is:
 /// PLANNED -> GERMINATION -> NURSERY -> IN_TRANSIT -> IN_POOL -> HARVESTED
-/// V1 application code only performs PLANNED -> GERMINATION.
+/// V1 application code performs PLANNED -> GERMINATION -> NURSERY (manual move).
 /// Seeding and transplanting are actions/events, not stages.
 /// Post-harvest outcomes (packed/surplus/waste) are deferred and are NOT stages.
 enum BatchStage {
@@ -55,6 +55,8 @@ enum ProductionTaskStatus {
 enum ProductionEventType {
   SEEDING_COMPLETED
   DESTINATION_CHANGED
+  MOVED_TO_NURSERY
+  GERMINATION_EXTENDED
 }
 
 /// Operational BOM types (docs/domain/MASTER_DATA_AND_BOM.md).
@@ -595,6 +597,11 @@ model LotInventoryTransaction {
 //      ON production_events (batch_id)
 //      WHERE event_type = 'SEEDING_COMPLETED';
 //
+// 2c. One move-to-nursery event per batch:
+//    CREATE UNIQUE INDEX production_events_moved_to_nursery_batch_key
+//      ON production_events (batch_id)
+//      WHERE event_type = 'MOVED_TO_NURSERY';
+//
 // 3. Lot XOR on allocations:
 //    ALTER TABLE event_lot_allocations
 //      ADD CONSTRAINT event_lot_allocations_lot_xor
@@ -619,3 +626,10 @@ model LotInventoryTransaction {
 // 5. One active (DRAFT or PUBLISHED) weekly plan per ISO week:
 //    CREATE UNIQUE INDEX weekly_plans_one_active_per_week_key
 //      ON weekly_plans (week) WHERE status IN ('DRAFT', 'PUBLISHED');
+//
+// 7. Active batches read model (GERMINATION + NURSERY only). Partial so
+//    historical PLANNED/HARVESTED rows are not scanned; includes
+//    visible_batch_number to match the overview orderBy.
+//    CREATE INDEX batches_active_stage_visible_number_idx
+//      ON batches (current_stage, visible_batch_number)
+//      WHERE current_stage IN ('GERMINATION', 'NURSERY');
