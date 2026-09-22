@@ -4,10 +4,12 @@ import {
   getTeam402,
   listSeedTodayForTeam,
 } from "@/lib/db/queries/seeding";
+import { getGermination402PageData } from "@/lib/db/queries/germination402";
 import { Button } from "@/components/ui/Button";
 import { PageHeader } from "@/components/layout/PageHeader";
 import { TodaySummary } from "@/components/402/TodaySummary";
 import { SeedTodayList } from "@/components/402/SeedTodayList";
+import { Germination402WorkerSurface } from "@/components/402/Germination402WorkerSurface";
 import { OPERATIONAL_TIMEZONE } from "@/lib/date";
 
 function formatMorningContext(instant = new Date()) {
@@ -29,6 +31,7 @@ export default async function Team402Page() {
   }
 
   const rows = await listSeedTodayForTeam(team.id);
+  const germination = await getGermination402PageData();
 
   const completed = rows.filter((row) => row.status === "COMPLETED").length;
   const inProgress = rows.filter((row) => row.status === "IN_PROGRESS").length;
@@ -62,6 +65,14 @@ export default async function Team402Page() {
       />
 
       <SeedTodayList rows={rows} />
+
+      {germination ? (
+        <Germination402WorkerSurface
+          dueRows={germination.lists.dueTodayAndOverdue}
+          futureRows={germination.lists.future}
+          workers={germination.workers}
+        />
+      ) : null}
     </main>
   );
 }
